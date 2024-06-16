@@ -11,7 +11,8 @@ Un utilitaire permettant de générer le mods.json pour FlowUpdater.
 
 ## Compiler le projet
 
-**Vous aurez besoin de Java 17 !**
+**Vous aurez besoin de Java 17 !**<br>
+**Vous aurez aussi besoin de [modrinth-api](https://github.com/Paulem79/Java-ModrinthAPI/tree/main) ! Suivez la section "Publish to maven local" pour l'ajouter au projet !**
 
 Vous devrez créer le fichier `Config.java` dans
 `src/main/java/io/github/paulem/fjc` et y mettre ceci :
