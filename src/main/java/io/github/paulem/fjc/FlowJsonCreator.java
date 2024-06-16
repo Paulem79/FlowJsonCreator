@@ -34,7 +34,7 @@ public class FlowJsonCreator {
     private static final Type MODS_TYPE = new TypeToken<ModsJson>() {
     }.getType();
 
-    public static final String CF_API_KEY = getCurseForgeAPIKey(); // Désolé Flow !
+    public static final String CF_API_KEY = Config.CF_API_KEY;
     public static CurseForgeAPI cfApi;
 
     public static Modrinth modrinth = new Modrinth(null, "paulem", "FlowJsonCreator", "1.1");
@@ -287,15 +287,5 @@ public class FlowJsonCreator {
         file.delete();
 
         return new UrlMod(fileName, jarUrl, sha1, size);
-    }
-
-    public static String getCurseForgeAPIKey()
-    {
-        return toString(Base64.getDecoder().decode(Config.CF_API_KEY.substring(0, Config.CF_API_KEY.length() - 5)));
-    }
-
-    public static String toString(byte[] bytes)
-    {
-        return new String(bytes, StandardCharsets.UTF_8);
     }
 }
