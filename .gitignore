@@ -1,3 +1,4 @@
+src/main/java/io/github/paulem/fjc/Config.java
 .idea
 .gradle
 build/

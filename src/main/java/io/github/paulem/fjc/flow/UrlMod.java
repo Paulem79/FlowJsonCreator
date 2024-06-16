@@ -3,7 +3,7 @@ package io.github.paulem.fjc.flow;
 /**
  * This class represents a Mod object.
  */
-public class Mod
+public class UrlMod
 {
     private final String name;
     private final String sha1;
@@ -17,7 +17,7 @@ public class Mod
      * @param sha1 Sha1 of mod file.
      * @param size Size of mod file.
      */
-    public Mod(String name, String downloadURL, String sha1, long size)
+    public UrlMod(String name, String downloadURL, String sha1, long size)
     {
         this.name = name;
         this.downloadURL = downloadURL;
