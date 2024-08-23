@@ -1,7 +1,7 @@
 plugins {
     id 'java'
     id 'application'
-    id 'com.github.johnrengelman.shadow' version '8.+'
+    id 'io.github.goooler.shadow' version '8.+'
 }
 
 group = 'io.github.paulem.fjc'
@@ -13,9 +13,6 @@ repositories {
 }
 
 dependencies {
-    implementation platform('org.junit:junit-bom:5.10.3')
-    implementation 'org.junit.jupiter:junit-jupiter'
-
     implementation 'io.github.paulem:modrinthapi:1.0'
     implementation 'org.jetbrains:annotations:24.1.0'
     implementation 'com.google.code.gson:gson:2.11.0'
@@ -30,10 +27,6 @@ application {
     getMainClass().set('io.github.paulem.fjc.FlowJsonCreator')
 }
 
-java {
-    withSourcesJar()
-}
-
 compileJava {
     sourceCompatibility = targetCompatibility = JavaVersion.VERSION_17
     options.encoding = 'UTF-8'
@@ -41,8 +34,4 @@ compileJava {
 
 jar {
     finalizedBy shadowJar
-}
-
-test {
-    useJUnitPlatform()
 }
