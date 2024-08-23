@@ -5,7 +5,7 @@ plugins {
 }
 
 group = 'io.github.paulem.fjc'
-version = '1.1'
+version = '1.2'
 
 repositories {
     mavenCentral()
@@ -13,8 +13,8 @@ repositories {
 }
 
 dependencies {
-    testImplementation platform('org.junit:junit-bom:5.10.2')
-    testImplementation 'org.junit.jupiter:junit-jupiter'
+    implementation platform('org.junit:junit-bom:5.10.3')
+    implementation 'org.junit.jupiter:junit-jupiter'
 
     implementation 'io.github.paulem:modrinthapi:1.0'
     implementation 'org.jetbrains:annotations:24.1.0'
@@ -23,6 +23,7 @@ dependencies {
     implementation 'io.github.matyrobbrt:curseforgeapi:1.8.0'
 
     implementation 'javax.xml.bind:jaxb-api:2.4.0-b180830.0359'
+    implementation 'net.sf.jopt-simple:jopt-simple:6.0-alpha-3'
 }
 
 application {
