@@ -1,9 +1,9 @@
-name: Build and Release
+name: "pre-release"
 
 on:
   push:
-    tags:
-      - 'v*'
+    branches:
+      - "master"
 
 jobs:
   build:
@@ -31,35 +31,20 @@ jobs:
           name: build-artifacts
           path: build/libs/*.jar
 
-  release:
-    permissions: write-all
-    needs: build
-    runs-on: ubuntu-latest
+  pre-release:
+    name: "Pre Release"
+    runs-on: "ubuntu-latest"
 
     steps:
-      - name: Download build artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: build-artifacts
-          path: build/libs
+      - name: "Build & test"
+        run: |
+          echo "done!"
 
-      - name: Create GitHub Release
-        id: create_release
-        uses: actions/create-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - uses: "marvinpinto/action-automatic-releases@latest"
         with:
-          tag_name: ${{ github.ref }}
-          release_name: Release ${{ github.ref }}
-          draft: false
-          prerelease: false
-
-      - name: Upload Release Asset
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: build/libs/*.jar
-          asset_name: FlowJsonCreator.jar
-          asset_content_type: application/java-archive
+          repo_token: "${{ secrets.GITHUB_TOKEN }}"
+          automatic_release_tag: "latest"
+          prerelease: true
+          title: "Development Build"
+          files: |
+            build/libs/*.jar
