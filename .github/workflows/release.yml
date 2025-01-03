@@ -29,6 +29,7 @@ jobs:
           path: build/libs/*.jar
 
   release:
+    permissions: write-all
     needs: build
     runs-on: ubuntu-latest
 
