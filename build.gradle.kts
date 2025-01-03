@@ -58,7 +58,7 @@ tasks.jar {
 }
 
 tasks.shadowJar {
-    archiveClassifier.set("");
+    archiveClassifier.set("")
 }
 
 configurations.matching { it.name.contains("downloadSources") }
