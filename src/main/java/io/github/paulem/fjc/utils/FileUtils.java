@@ -1,7 +1,8 @@
 package io.github.paulem.fjc.utils;
 
-import io.github.paulem.fjc.FlowJsonCreator;
+import io.github.paulem.fjc.gui.components.DownloadProgressBar;
 import io.github.paulem.fjc.flow.UrlMod;
+import io.github.paulem.fjc.gui.Main;
 
 import javax.xml.bind.annotation.adapters.HexBinaryAdapter;
 import java.io.*;
@@ -11,11 +12,14 @@ import java.nio.file.Path;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Consumer;
 
 public class FileUtils {
     public static Path getActualJar() {
         try {
-            return Path.of(FlowJsonCreator.class.getProtectionDomain().getCodeSource().getLocation()
+            return Path.of(Main.class.getProtectionDomain().getCodeSource().getLocation()
                     .toURI());
         } catch (URISyntaxException e) {
             throw new RuntimeException(e);
@@ -68,16 +72,22 @@ public class FileUtils {
         }
     }
 
-    public static UrlMod getDownloadedMod(String jarUrl, String fileName) throws IOException, NoSuchAlgorithmException {
+    public static void getDownloadedMod(String jarUrl, String fileName, Consumer<UrlMod> after) throws IOException, NoSuchAlgorithmException {
         File file = getActualJar().getParent().resolve(UUID.randomUUID() + ".jar").toFile();
 
-        downloadFile(jarUrl, file);
+        AtomicReference<String> sha1 = new AtomicReference<>();
+        AtomicLong size = new AtomicLong();
+        new DownloadProgressBar(jarUrl, file, () -> {
+            try {
+                sha1.set(calcSHA1(file));
+            } catch (IOException | NoSuchAlgorithmException e) {
+                throw new RuntimeException(e);
+            }
+            size.set(file.length());
 
-        String sha1 = calcSHA1(file);
-        long size = file.length();
+            file.delete();
 
-        file.delete();
-
-        return new UrlMod(fileName, jarUrl, sha1, size);
+            after.accept(new UrlMod(fileName, jarUrl, sha1.get(), size.get()));
+        });
     }
 }
