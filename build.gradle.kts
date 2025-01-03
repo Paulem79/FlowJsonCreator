@@ -19,7 +19,6 @@ repositories {
 
 dependencies {
     // API dependencies
-    implementation("io.github.paulem:modrinthapi:1.+")
     implementation("io.github.matyrobbrt:curseforgeapi:1.+")
 
     // UI
