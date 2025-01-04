@@ -91,6 +91,8 @@ tasks.jpackage {
 
     mac {
         icon = "icons/icons.icns"
+
+        type = ImageType.DMG
     }
 
     windows {
