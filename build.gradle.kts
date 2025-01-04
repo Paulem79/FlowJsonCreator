@@ -161,4 +161,6 @@ tasks.register<JavaExec>("runShadowJar") {
 
     classpath = files(tasks.shadowJar.get().archiveFile)
     setExecutable(javaPath)
+
+    finalizedBy(tasks.clean)
 }
