@@ -1,4 +1,4 @@
-name: "pre-release"
+name: "Release"
 
 on:
   push:
@@ -6,7 +6,7 @@ on:
       - "main"
 
 jobs:
-  build:
+  build-ubuntu:
     permissions: write-all
     runs-on: ubuntu-latest
 
@@ -17,25 +17,80 @@ jobs:
       - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
-          distribution: 'temurin'
+          distribution: 'liberica'
           java-version: '17'
 
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
       - name: Build with Gradle
-        run: ./gradlew shadowJar
+        run: ./gradlew jpackage
 
       - name: Archive build artifacts
         uses: actions/upload-artifact@v4
         with:
           name: build-artifacts
-          path: build/libs/*.jar
+          path: dist
+
+  build-macos:
+    permissions: write-all
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'liberica'
+          java-version: '17'
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      - name: Build with Gradle
+        run: ./gradlew jpackage
+
+      - name: Archive build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts
+          path: dist
+
+  build-windows:
+    permissions: write-all
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'liberica'
+          java-version: '17'
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      - name: Build with Gradle
+        run: ./gradlew jpackage
+
+      - name: Archive build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts
+          path: dist
 
   pre-release:
     permissions: write-all
     name: "Release"
-    needs: build
+    needs:
+      - build-ubuntu
+      - build-macos
+      - build-windows
     runs-on: "ubuntu-latest"
 
     steps:
@@ -43,7 +98,7 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           name: build-artifacts
-          path: build/libs/*.jar
+          path: dist
 
       - uses: "marvinpinto/action-automatic-releases@latest"
         with:

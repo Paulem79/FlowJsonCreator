@@ -21,7 +21,7 @@ public class JsonUtils {
     }.getType();
 
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
-    private static final File modsJson = getActualJar().getParent().resolve("mods.json").toFile();
+    private static final File modsJson = getActualJar().getParent().getParent().resolve("mods.json").toFile();
     private static JsonReader reader;
 
     public static void createJsonFile() throws IOException {

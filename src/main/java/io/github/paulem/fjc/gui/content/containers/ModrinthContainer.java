@@ -117,8 +117,6 @@ public class ModrinthContainer extends SearchContainer {
                                     boolean matchGameVersion = versionField.getText().isEmpty() || version.gameVersions().contains(versionField.getText());
                                     boolean matchLoader = (loaderComboBox.getValue() == null || loaderComboBox.getValue().equalsIgnoreCase("any")) || version.loaders().contains(loaderComboBox.getValue().toLowerCase());
 
-                                    System.out.println(matchGameVersion + " - " + matchLoader);
-
                                     return matchGameVersion && matchLoader;
                                 })
                                 .toList();

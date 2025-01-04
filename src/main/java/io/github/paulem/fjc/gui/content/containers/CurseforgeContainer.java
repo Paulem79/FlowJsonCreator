@@ -115,8 +115,6 @@ public class CurseforgeContainer extends SearchContainer {
                                         boolean matchGameVersion = versionField.getText().isEmpty() || version.gameVersions().contains(versionField.getText());
                                         boolean matchLoader = (loaderComboBox.getValue() == null || loaderComboBox.getValue().equalsIgnoreCase("any")) || version.gameVersions().contains(ManipulationUtils.capitalize(loaderComboBox.getValue()));
 
-                                        System.out.println(matchGameVersion + " - " + matchLoader);
-
                                         return matchGameVersion && matchLoader;
                                     })
                                     .toList();

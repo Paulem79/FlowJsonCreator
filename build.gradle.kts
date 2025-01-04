@@ -1,13 +1,14 @@
+import org.gradle.internal.jvm.Jvm
 import org.gradle.nativeplatform.platform.internal.DefaultNativePlatform
+import org.panteleyev.jpackage.ImageType
 
 plugins {
     id("idea")
     id("io.github.goooler.shadow") version "8.+"
     id("java")
     id("application")
-    id("org.openjfx.javafxplugin") version "0.+"
+    id("org.panteleyev.jpackageplugin") version "1.6.0"
 }
-apply(plugin = "org.openjfx.javafxplugin")
 
 group = "io.github.paulem.fjc"
 version = "1.3"
@@ -40,12 +41,7 @@ application {
     mainClass.set("io.github.paulem.fjc.gui.Main")
 }
 
-javafx {
-    version = "22.+"
-    modules("javafx.controls")
-}
-
-tasks.compileJava {
+tasks.withType<JavaCompile>().configureEach {
     JavaVersion.VERSION_17.toString().also {
         sourceCompatibility = it
         targetCompatibility = it
@@ -53,12 +49,61 @@ tasks.compileJava {
     options.encoding = "UTF-8"
 }
 
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(17)
+        vendor = JvmVendorSpec.BELLSOFT
+    }
+}
+
 tasks.jar {
     finalizedBy(tasks.shadowJar)
 }
 
 tasks.shadowJar {
+    mustRunAfter(tasks.distZip)
+    mustRunAfter(tasks.distTar)
+    mustRunAfter(tasks.startScripts)
+
     archiveClassifier.set("")
+}
+
+task("deleteDist", Delete::class) {
+    delete("dist")
+}
+
+tasks.jpackage {
+    dependsOn("deleteDist", "build")
+
+    appName = "FlowJsonCreator"
+    appVersion = project.version.toString()
+    vendor = "Paulem"
+    copyright = "Copyright (c) 2025 Paulem"
+    runtimeImage = Jvm.current().javaHome.toString()
+    destination = "dist"
+    input = "build/libs"
+    mainJar = tasks.shadowJar.get().archiveFile.get().asFile.name
+    javaOptions = listOf("-Dfile.encoding=UTF-8")
+
+    linux {
+        type = ImageType.DEB
+    }
+
+    mac {
+        icon = "icons/icons.icns"
+    }
+
+    windows {
+        icon = "icons/icons.ico"
+
+        type = ImageType.MSI
+
+        winConsole = true
+        if(type == ImageType.EXE || type == ImageType.MSI) {
+            winMenu = true
+            winDirChooser = true
+        }
+    }
 }
 
 configurations.matching { it.name.contains("downloadSources") }
@@ -73,8 +118,7 @@ configurations.matching { it.name.contains("downloadSources") }
     }
 
 tasks.register<JavaExec>("runShadowJar") {
-    val javaPath = "C:\\Program Files\\Zulu\\zulu-23\\bin\\java.exe"
-    val cfKey = "\$2a\$10\$pEf8ZqqpXN3mWm.nZgjA0.dvobnxeWxPeffkd9dHBEabweZQhvqKi"
+    val javaPath = "C:\\Users\\paule\\.gradle\\jdks\\eclipse_adoptium-17-amd64-windows\\jdk-17.0.11+9\\bin\\java.exe"
 
     group = "application"
     description = "Builds and runs the shadow jar using the specified Java path"
@@ -83,5 +127,4 @@ tasks.register<JavaExec>("runShadowJar") {
 
     classpath = files(tasks.shadowJar.get().archiveFile)
     setExecutable(javaPath)
-    args("-cfKey", cfKey)
 }
