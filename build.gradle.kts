@@ -1,6 +1,6 @@
 import org.gradle.internal.jvm.Jvm
-import org.gradle.nativeplatform.platform.internal.DefaultNativePlatform
 import org.panteleyev.jpackage.ImageType
+import org.panteleyev.jpackage.JPackageTask
 
 plugins {
     id("idea")
@@ -56,30 +56,8 @@ java {
     }
 }
 
-tasks.jar {
-    mustRunAfter(tasks.clean)
-    finalizedBy(tasks.shadowJar)
-}
-
-tasks.shadowJar {
-    mustRunAfter(tasks.distZip)
-    mustRunAfter(tasks.distTar)
-    mustRunAfter(tasks.startScripts)
-
-    archiveVersion.set("")
-    archiveClassifier.set("")
-}
-
-tasks.register<Delete>("deleteDist") {
-    delete("dist")
-}
-
-tasks.clean {
-    dependsOn("deleteDist")
-}
-
-tasks.jpackage {
-    dependsOn(tasks.clean, tasks.build)
+tasks.withType<JPackageTask>().configureEach {
+    dependsOn(tasks.build)
 
     appName = "FlowJsonCreator"
     appVersion = project.version.toString()
@@ -91,7 +69,39 @@ tasks.jpackage {
     mainJar = tasks.shadowJar.get().archiveFileName.get()
     mainClass = application.mainClass.get()
     javaOptions = listOf("-Dfile.encoding=UTF-8")
+}
 
+var infra = ""
+tasks.register<JPackageTask>("zipjpackage") {
+    finalizedBy("zipPackage")
+
+    type = ImageType.APP_IMAGE
+
+    linux {
+        infra = "linux"
+    }
+
+    mac {
+        icon = "icons/icons.icns"
+        infra = "mac"
+    }
+
+    windows {
+        icon = "icons/icons.ico"
+
+        winConsole = true
+        infra = "win"
+    }
+}
+
+tasks.register<Zip>("zipPackage") {
+    archiveFileName.set(infra + "-FlowJsonCreator-" + project.version + ".zip")
+    destinationDirectory.set(layout.projectDirectory.dir("dist"))
+
+    from(layout.projectDirectory.dir("dist/FlowJsonCreator"))
+}
+
+tasks.jpackage {
     linux {
         type = ImageType.DEB
     }
@@ -108,15 +118,37 @@ tasks.jpackage {
         type = ImageType.MSI
 
         winConsole = true
-        winShortcut = true
-        winShortcutPrompt = true
         if(type == ImageType.EXE || type == ImageType.MSI) {
             winMenu = true
             winDirChooser = true
             winPerUserInstall = true
+            winShortcut = true
+            winShortcutPrompt = true
             // winUpdateUrl can be interesting for auto-updates
         }
     }
+}
+
+tasks.clean {
+    dependsOn("deleteDist")
+}
+
+tasks.jar {
+    mustRunAfter(tasks.clean)
+    finalizedBy(tasks.shadowJar)
+}
+
+tasks.shadowJar {
+    mustRunAfter(tasks.distZip)
+    mustRunAfter(tasks.distTar)
+    mustRunAfter(tasks.startScripts)
+
+    archiveVersion.set("")
+    archiveClassifier.set("")
+}
+
+tasks.register<Delete>("deleteDist") {
+    delete("dist")
 }
 
 tasks.register<JavaExec>("runShadowJar") {
