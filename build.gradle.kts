@@ -65,6 +65,7 @@ tasks.shadowJar {
     mustRunAfter(tasks.distTar)
     mustRunAfter(tasks.startScripts)
 
+    archiveVersion.set("")
     archiveClassifier.set("")
 }
 
