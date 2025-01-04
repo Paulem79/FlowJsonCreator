@@ -12,15 +12,10 @@ Un utilitaire permettant de générer le fichier mods.json pour FlowUpdater.
 ---
 ## Utiliser le projet
 **Vous aurez besoin de Java 17 ou plus pour lancer le projet !**<br>
-Rendez vous [ici](https://github.com/Paulem79/FlowJsonCreator/releases/latest) pour obtenir la dernière version, puis, lancez-la avec :
-```shell
-java -jar FlowJsonCreator-x-x.jar
-```
-(Si votre `java` est Java 17 ou plus, évidemment)<br>
-Et profitez !
+Rendez vous [ici](https://github.com/Paulem79/FlowJsonCreator/releases/latest) pour obtenir la dernière version, puis, installez-la et profitez !
 
 ### Arguments de lancement
-`--cfKey` permet de définir la clé d'API Curseforge (pour utiliser la navigation des fichiers).<br>
+`--cfKey` permet de définir la clé d'API Curseforge (utile pour la navigation des fichiers).<br>
 Vous pouvez l'obtenir en suivant [ce tutoriel](https://support.curseforge.com/en/support/solutions/articles/9000208346-about-the-curseforge-api-and-how-to-apply-for-a-key).
 
 ---
@@ -35,6 +30,6 @@ Ensuite, compilez le projet avec :
 
 Puis exécutez le fichier jar sorti dans `build/libs/FlowJsonCreator-x.x.jar` avec Java 17 ou plus :
 ```shell
-java -jar build/libs/FlowJsonCreator-x.x.jar
+java -jar build/libs/FlowJsonCreator.jar
 ```
-(Si votre `java` est Java 17 ou plus, évidemment)<br>
+(Si votre `java` est Java 17 ou plus, évidemment)
