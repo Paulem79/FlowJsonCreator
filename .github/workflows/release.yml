@@ -30,7 +30,7 @@ jobs:
       - name: Archive build artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: build-artifacts
+          name: ubuntu-build-artifacts
           path: dist
 
   build-macos:
@@ -57,7 +57,7 @@ jobs:
       - name: Archive build artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: build-artifacts
+          name: macos-build-artifacts
           path: dist
 
   build-windows:
@@ -84,7 +84,7 @@ jobs:
       - name: Archive build artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: build-artifacts
+          name: windows-build-artifacts
           path: dist
 
   pre-release:
@@ -100,7 +100,15 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
         with:
-          name: build-artifacts
+          name: ubuntu-build-artifacts
+          path: dist
+      - uses: actions/download-artifact@v4
+        with:
+          name: macos-build-artifacts
+          path: dist
+      - uses: actions/download-artifact@v4
+        with:
+          name: windows-build-artifacts
           path: dist
 
       - uses: "marvinpinto/action-automatic-releases@latest"
