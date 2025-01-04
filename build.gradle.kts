@@ -57,6 +57,7 @@ java {
 }
 
 tasks.jar {
+    mustRunAfter(tasks.clean)
     finalizedBy(tasks.shadowJar)
 }
 
