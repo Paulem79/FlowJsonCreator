@@ -83,14 +83,14 @@ tasks.register<JPackageTask>("zipjpackage") {
 
     mac {
         icon = "icons/icons.icns"
-        infra = "mac"
+        infra = "macos"
     }
 
     windows {
         icon = "icons/icons.ico"
 
         winConsole = true
-        infra = "win"
+        infra = "windows"
     }
 }
 
