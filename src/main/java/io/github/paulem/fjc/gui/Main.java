@@ -20,6 +20,8 @@ import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Scene;
 import javafx.scene.control.*;
+import javafx.scene.control.Button;
+import javafx.scene.control.Label;
 import javafx.scene.input.MouseButton;
 import javafx.scene.layout.GridPane;
 import javafx.scene.layout.HBox;
@@ -33,6 +35,7 @@ import joptsimple.OptionSet;
 import org.jetbrains.annotations.Nullable;
 
 import javax.security.auth.login.LoginException;
+import java.awt.*;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.List;
@@ -97,9 +100,22 @@ public class Main extends Application {
         VBox modsJsonBox = new VBox(10);
         mainGrid.add(modsJsonBox, 2, 0, 2, 3);
 
+        HBox modsViewerBox = new HBox(10);
+        modsJsonBox.getChildren().add(modsViewerBox);
+
         Label modsJsonLabel = new Label("Mods.json");
         modsJsonLabel.setTranslateY(5);
-        modsJsonBox.getChildren().add(modsJsonLabel);
+        modsViewerBox.getChildren().add(modsJsonLabel);
+
+        Button btn = new Button("Ouvrir");
+        modsViewerBox.getChildren().add(btn);
+        btn.setOnAction(actionEvent -> {
+            try {
+                Desktop.getDesktop().open(modsJson.getParentFile());
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+        });
 
         list = new ListView<>();
         modsJsonBox.getChildren().add(list);

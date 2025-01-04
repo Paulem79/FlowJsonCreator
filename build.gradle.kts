@@ -68,12 +68,12 @@ tasks.shadowJar {
     archiveClassifier.set("")
 }
 
-task("deleteDist", Delete::class) {
+tasks.register<Delete>("deleteDist") {
     delete("dist")
 }
 
 tasks.jpackage {
-    dependsOn("deleteDist", "build")
+    dependsOn("deleteDist", tasks.build)
 
     appName = "FlowJsonCreator"
     appVersion = project.version.toString()
@@ -82,7 +82,8 @@ tasks.jpackage {
     runtimeImage = Jvm.current().javaHome.toString()
     destination = "dist"
     input = "build/libs"
-    mainJar = tasks.shadowJar.get().archiveFile.get().asFile.name
+    mainJar = tasks.shadowJar.get().archiveFileName.get()
+    mainClass = application.mainClass.get()
     javaOptions = listOf("-Dfile.encoding=UTF-8")
 
     linux {
@@ -104,6 +105,8 @@ tasks.jpackage {
         if(type == ImageType.EXE || type == ImageType.MSI) {
             winMenu = true
             winDirChooser = true
+            winPerUserInstall = true
+            // winUpdateUrl can be interesting for auto-updates
         }
     }
 }
@@ -120,7 +123,7 @@ configurations.matching { it.name.contains("downloadSources") }
     }
 
 tasks.register<JavaExec>("runShadowJar") {
-    val javaPath = "C:\\Users\\paule\\.gradle\\jdks\\eclipse_adoptium-17-amd64-windows\\jdk-17.0.11+9\\bin\\java.exe"
+    val javaPath = Jvm.current().javaExecutable.toString()
 
     group = "application"
     description = "Builds and runs the shadow jar using the specified Java path"
