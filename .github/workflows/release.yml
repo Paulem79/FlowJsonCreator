@@ -19,6 +19,7 @@ jobs:
         with:
           distribution: 'liberica'
           java-version: '17'
+          java-package: jdk+fx
 
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
@@ -45,6 +46,7 @@ jobs:
         with:
           distribution: 'liberica'
           java-version: '17'
+          java-package: jdk+fx
 
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
@@ -71,6 +73,7 @@ jobs:
         with:
           distribution: 'liberica'
           java-version: '17'
+          java-package: jdk+fx
 
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
