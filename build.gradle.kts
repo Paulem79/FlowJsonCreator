@@ -73,8 +73,12 @@ tasks.register<Delete>("deleteDist") {
     delete("dist")
 }
 
+tasks.clean {
+    dependsOn("deleteDist")
+}
+
 tasks.jpackage {
-    dependsOn("deleteDist", tasks.build)
+    dependsOn(tasks.clean, tasks.build)
 
     appName = "FlowJsonCreator"
     appVersion = project.version.toString()
@@ -103,6 +107,8 @@ tasks.jpackage {
         type = ImageType.MSI
 
         winConsole = true
+        winShortcut = true
+        winShortcutPrompt = true
         if(type == ImageType.EXE || type == ImageType.MSI) {
             winMenu = true
             winDirChooser = true
@@ -111,17 +117,6 @@ tasks.jpackage {
         }
     }
 }
-
-configurations.matching { it.name.contains("downloadSources") }
-    .configureEach {
-        attributes {
-            val os = DefaultNativePlatform.getCurrentOperatingSystem().toFamilyName()
-            val arch = DefaultNativePlatform.getCurrentArchitecture().name
-            attribute(Usage.USAGE_ATTRIBUTE, objects.named(Usage::class, Usage.JAVA_RUNTIME))
-            attribute(OperatingSystemFamily.OPERATING_SYSTEM_ATTRIBUTE, objects.named(OperatingSystemFamily::class, os))
-            attribute(MachineArchitecture.ARCHITECTURE_ATTRIBUTE, objects.named(MachineArchitecture::class, arch))
-        }
-    }
 
 tasks.register<JavaExec>("runShadowJar") {
     val javaPath = Jvm.current().javaExecutable.toString()
