@@ -62,7 +62,7 @@ java {
 }
 
 tasks.withType<JPackageTask>().configureEach {
-    dependsOn(tasks.build)
+    dependsOn(tasks.shadowJar)
 
     appName = "FlowJsonCreator"
     appVersion = project.version.toString()
@@ -161,7 +161,7 @@ tasks.register<JavaExec>("runShadowJar") {
     group = "application"
     description = "Builds and runs the shadow jar using the specified Java path"
 
-    dependsOn(tasks.build)
+    dependsOn(tasks.shadowJar)
 
     classpath = files(tasks.shadowJar.get().archiveFile)
     setExecutable(javaPath)

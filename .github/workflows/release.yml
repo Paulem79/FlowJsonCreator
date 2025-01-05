@@ -25,15 +25,20 @@ jobs:
           distribution: 'liberica'
           java-version: '17'
           java-package: jdk+fx
+          cache: gradle
 
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
-      - name: Build with Gradle (jpackage)
-        run: ./gradlew jpackage
+      - name: Gradle jpackage
+        uses: gradle/gradle-build-action@v3
+        with:
+          arguments: jpackage
 
-      - name: Build with Gradle (zipjpackage)
-        run: ./gradlew zipjpackage
+      - name: Gradle zipjpackage
+        uses: gradle/gradle-build-action@v3
+        with:
+          arguments: zipjpackage
 
       - name: Archive build artifacts
         uses: actions/upload-artifact@v4
