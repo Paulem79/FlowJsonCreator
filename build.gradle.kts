@@ -16,14 +16,19 @@ version = "1.3"
 repositories {
     mavenCentral()
     mavenLocal()
+
+    maven { url = uri("https://jitpack.io") }
 }
 
 dependencies {
     // API dependencies
-    implementation("io.github.matyrobbrt:curseforgeapi:1.+")
+    // implementation("io.github.matyrobbrt:curseforgeapi:1.+")
+    implementation("org.slf4j:slf4j-api:1.7.36")
+    implementation("com.github.mizosoft.methanol:methanol:1.6.0")
 
     // UI
     implementation("io.github.mkpaz:atlantafx-base:2.+")
+    implementation("com.github.Dansoftowner:FXTaskbarProgressBar:v11.4")
 
     // Core
     implementation("com.google.guava:guava:33.4.0-jre")
@@ -68,7 +73,7 @@ tasks.withType<JPackageTask>().configureEach {
     input = "build/libs"
     mainJar = tasks.shadowJar.get().archiveFileName.get()
     mainClass = application.mainClass.get()
-    javaOptions = listOf("-Dfile.encoding=UTF-8")
+    javaOptions = listOf("-Dfile.encoding=UTF-8", "--add-exports=javafx.graphics/com.sun.glass.ui=ALL-UNNAMED")
 }
 
 var infra = ""
@@ -134,7 +139,6 @@ tasks.clean {
 }
 
 tasks.jar {
-    mustRunAfter(tasks.clean)
     finalizedBy(tasks.shadowJar)
 }
 
@@ -157,10 +161,11 @@ tasks.register<JavaExec>("runShadowJar") {
     group = "application"
     description = "Builds and runs the shadow jar using the specified Java path"
 
-    dependsOn(tasks.shadowJar)
+    dependsOn(tasks.build)
 
     classpath = files(tasks.shadowJar.get().archiveFile)
     setExecutable(javaPath)
+    jvmArgs("--add-exports=javafx.graphics/com.sun.glass.ui=ALL-UNNAMED")
 
     finalizedBy(tasks.clean)
 }

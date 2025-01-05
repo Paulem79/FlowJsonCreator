@@ -1,5 +1,6 @@
 package io.github.paulem.fjc.gui.components;
 
+import com.nativejavafx.taskbar.TaskbarProgressbar;
 import io.github.paulem.fjc.threads.NotifierThread;
 import javafx.application.Platform;
 import javafx.scene.Scene;
@@ -13,11 +14,13 @@ import java.io.File;
 import java.io.IOException;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.util.concurrent.atomic.AtomicInteger;
 
 public class DownloadProgressBar {
     private static final int WIDTH = 280;
     private static final int HEIGHT = 30;
 
+    private Stage popupStage;
     private ProgressBar progressBar;
     private final String downloadUrl;
     private final File file;
@@ -31,7 +34,7 @@ public class DownloadProgressBar {
     }
 
     public void showPopup() {
-        Stage popupStage = new Stage();
+        popupStage = new Stage();
         popupStage.initModality(Modality.NONE);
         progressBar = new ProgressBar(0);
         progressBar.setMinWidth(WIDTH);
@@ -51,7 +54,11 @@ public class DownloadProgressBar {
         };
         downloadThread.addListener(() -> {
             onFinish.run();
-            Platform.runLater(popupStage::close);
+            Platform.runLater(() -> {
+                if(TaskbarProgressbar.isSupported())
+                    TaskbarProgressbar.stopProgress(popupStage);
+                popupStage.close();
+            });
         });
         downloadThread.start();
     }
@@ -68,6 +75,8 @@ public class DownloadProgressBar {
             byte[] data = new byte[1024];
             long downloadedFileSize = 0;
             int x;
+
+            AtomicInteger progressBarUpdate = new AtomicInteger();
             while ((x = in.read(data, 0, 1024)) >= 0) {
                 downloadedFileSize += x;
 
@@ -75,7 +84,15 @@ public class DownloadProgressBar {
                 final double currentProgress = (double) downloadedFileSize / completeFileSize;
 
                 // update progress bar
-                Platform.runLater(() -> progressBar.setProgress(currentProgress));
+                Platform.runLater(() -> {
+                    progressBar.setProgress(currentProgress);
+
+                    progressBarUpdate.getAndIncrement();
+                    if(progressBarUpdate.get() == 5 && TaskbarProgressbar.isSupported()) {
+                        TaskbarProgressbar.showCustomProgress(popupStage, currentProgress, TaskbarProgressbar.Type.NORMAL);
+                        progressBarUpdate.set(0);
+                    }
+                });
 
                 bout.write(data, 0, x);
             }
