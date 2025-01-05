@@ -31,14 +31,10 @@ jobs:
         run: chmod +x gradlew
 
       - name: Gradle jpackage
-        uses: gradle/gradle-build-action@v3
-        with:
-          arguments: jpackage
+        run: ./gradlew jpackage
 
       - name: Gradle zipjpackage
-        uses: gradle/gradle-build-action@v3
-        with:
-          arguments: zipjpackage
+        run: ./gradlew zipjpackage
 
       - name: Archive build artifacts
         uses: actions/upload-artifact@v4
