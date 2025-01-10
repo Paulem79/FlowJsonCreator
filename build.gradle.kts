@@ -10,7 +10,7 @@ plugins {
     id("org.panteleyev.jpackageplugin") version "1.6.0"
 }
 
-group = "io.github.paulem.fjc"
+group = "ovh.paulem.fjc"
 version = "1.3"
 
 repositories {
@@ -22,7 +22,8 @@ repositories {
 
 dependencies {
     // API dependencies
-    // implementation("io.github.matyrobbrt:curseforgeapi:1.+")
+    implementation("ovh.paulem:modrinthapi:1.+")
+    // implementation("io.github.matyrobbrt:io.github.matyrobbrt.curseforgeapi:1.+")
     implementation("org.slf4j:slf4j-api:1.7.36")
     implementation("com.github.mizosoft.methanol:methanol:1.6.0")
 
@@ -43,7 +44,7 @@ dependencies {
 }
 
 application {
-    mainClass.set("io.github.paulem.fjc.gui.Main")
+    mainClass.set("ovh.paulem.fjc.gui.Main")
 }
 
 tasks.withType<JavaCompile>().configureEach {

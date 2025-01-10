@@ -9,4 +9,5 @@ module FlowJsonCreator {
     requires org.slf4j;
     requires java.desktop;
     requires nativejavafx.taskbar;
+    requires modrinthapi;
 }
