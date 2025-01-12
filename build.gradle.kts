@@ -4,7 +4,7 @@ import org.panteleyev.jpackage.JPackageTask
 
 plugins {
     id("idea")
-    id("io.github.goooler.shadow") version "8.+"
+    id("com.gradleup.shadow") version "8.+"
     id("java")
     id("application")
     id("org.panteleyev.jpackageplugin") version "1.6.0"
