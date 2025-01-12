@@ -1,12 +1,12 @@
 package ovh.paulem.fjc.gui.content.containers;
 
-import io.github.matyrobbrt.curseforgeapi.schemas.mod.ModLoaderType;
 import io.github.matyrobbrt.curseforgeapi.util.Utils;
 import ovh.paulem.fjc.flow.ModrinthMod;
 import ovh.paulem.fjc.flow.SelectState;
 import ovh.paulem.fjc.gui.Main;
 import ovh.paulem.fjc.gui.components.PropertiesViewerPopup;
 import ovh.paulem.fjc.utils.JsonUtils;
+import ovh.paulem.fjc.utils.ManipulationUtils;
 import ovh.paulem.fjc.utils.ModrinthUtils;
 import ovh.paulem.modrinthapi.types.project.Project;
 import ovh.paulem.modrinthapi.types.project.ProjectResult;
@@ -87,8 +87,7 @@ public class ModrinthContainer extends SearchContainer {
 
         loaderComboBox = new ComboBox<>();
 
-        List<String> loaders = Arrays.stream(ModLoaderType.values()).map(ModLoaderType::toString).toList();
-        loaderComboBox.getItems().addAll(loaders);
+        loaderComboBox.getItems().addAll(ManipulationUtils.getModLoaders());
         loaderBox.getChildren().add(loaderComboBox);
         // ------- END LOADER -------
 
@@ -198,7 +197,7 @@ public class ModrinthContainer extends SearchContainer {
         }
 
         String selectedLoader = loaderComboBox.getValue();
-        if(selectedLoader != null) {
+        if(selectedLoader != null && !selectedLoader.equalsIgnoreCase("any")) {
             facet += ",[\"categories:" + selectedLoader.toLowerCase() + "\"]";
         }
 

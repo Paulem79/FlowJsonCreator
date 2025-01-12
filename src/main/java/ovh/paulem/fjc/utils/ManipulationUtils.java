@@ -1,8 +1,12 @@
 package ovh.paulem.fjc.utils;
 
 import com.google.gson.JsonPrimitive;
+import io.github.matyrobbrt.curseforgeapi.schemas.mod.ModLoaderType;
 import joptsimple.OptionSet;
 import org.jetbrains.annotations.Nullable;
+
+import java.util.Arrays;
+import java.util.List;
 
 public class ManipulationUtils {
     public static<T> String collectionToString(Iterable<T> collection, String append) {
@@ -31,5 +35,12 @@ public class ManipulationUtils {
 
     public static String capitalize(String str) {
         return str.substring(0, 1).toUpperCase() + str.substring(1).toLowerCase();
+    }
+
+    public static List<String> getModLoaders() {
+        return Arrays.stream(ModLoaderType.values())
+                .filter(modLoaderType -> modLoaderType != ModLoaderType.CAULDRON && modLoaderType != ModLoaderType.LITE_LOADER)
+                .map(ModLoaderType::toString)
+                .toList();
     }
 }

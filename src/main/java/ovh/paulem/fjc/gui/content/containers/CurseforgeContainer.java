@@ -86,8 +86,7 @@ public class CurseforgeContainer extends SearchContainer {
 
         loaderComboBox = new ComboBox<>();
 
-        List<String> loaders = Arrays.stream(ModLoaderType.values()).map(ModLoaderType::toString).toList();
-        loaderComboBox.getItems().addAll(loaders);
+        loaderComboBox.getItems().addAll(ManipulationUtils.getModLoaders());
         loaderBox.getChildren().add(loaderComboBox);
         // ------- END LOADER -------
 
@@ -208,7 +207,7 @@ public class CurseforgeContainer extends SearchContainer {
         }
 
         String selectedLoader = loaderComboBox.getValue();
-        if(selectedLoader != null) {
+        if(selectedLoader != null && !selectedLoader.equalsIgnoreCase("any")) {
             Arrays.stream(ModLoaderType.values())
                     .filter(modLoaderType -> modLoaderType.toString().equals(selectedLoader))
                     .findFirst()

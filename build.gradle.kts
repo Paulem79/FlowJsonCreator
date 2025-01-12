@@ -26,9 +26,10 @@ repositories {
 dependencies {
     // API dependencies
     implementation("ovh.paulem:modrinthapi:1.+")
-    // implementation("io.github.matyrobbrt:io.github.matyrobbrt.curseforgeapi:1.+")
-    implementation("org.slf4j:slf4j-api:1.7.36")
-    implementation("com.github.mizosoft.methanol:methanol:1.6.0")
+    implementation("io.github.matyrobbrt:curseforgeapi:1.+")
+
+    // Remove annoying warnings for slf4j
+    implementation("org.slf4j:slf4j-simple:1.7.36")
 
     // UI
     implementation("io.github.mkpaz:atlantafx-base:2.+")
