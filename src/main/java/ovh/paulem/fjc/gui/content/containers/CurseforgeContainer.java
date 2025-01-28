@@ -8,7 +8,7 @@ import io.github.matyrobbrt.curseforgeapi.schemas.mod.ModLoaderType;
 import io.github.matyrobbrt.curseforgeapi.util.Constants;
 import io.github.matyrobbrt.curseforgeapi.util.CurseForgeException;
 import ovh.paulem.fjc.flow.SelectState;
-import ovh.paulem.fjc.gui.Main;
+import ovh.paulem.fjc.Main;
 import ovh.paulem.fjc.gui.components.PropertiesViewerPopup;
 import ovh.paulem.fjc.flow.CurseForgeMod;
 import ovh.paulem.fjc.utils.CFUtils;

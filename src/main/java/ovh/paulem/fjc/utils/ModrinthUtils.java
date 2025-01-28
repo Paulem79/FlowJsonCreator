@@ -1,6 +1,6 @@
 package ovh.paulem.fjc.utils;
 
-import ovh.paulem.fjc.gui.Main;
+import ovh.paulem.fjc.Main;
 import ovh.paulem.modrinthapi.types.project.Project;
 import org.jetbrains.annotations.Nullable;
 

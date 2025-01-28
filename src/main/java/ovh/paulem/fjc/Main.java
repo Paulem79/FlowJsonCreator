@@ -1,4 +1,4 @@
-package ovh.paulem.fjc.gui;
+package ovh.paulem.fjc;
 
 import atlantafx.base.theme.PrimerDark;
 import io.github.matyrobbrt.curseforgeapi.CurseForgeAPI;

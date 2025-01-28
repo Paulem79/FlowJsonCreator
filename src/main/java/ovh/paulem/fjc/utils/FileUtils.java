@@ -2,7 +2,7 @@ package ovh.paulem.fjc.utils;
 
 import ovh.paulem.fjc.gui.components.DownloadProgressBar;
 import ovh.paulem.fjc.flow.UrlMod;
-import ovh.paulem.fjc.gui.Main;
+import ovh.paulem.fjc.Main;
 
 import javax.xml.bind.annotation.adapters.HexBinaryAdapter;
 import java.io.*;

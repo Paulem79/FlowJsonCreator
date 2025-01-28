@@ -3,7 +3,7 @@ package ovh.paulem.fjc.gui.content.containers;
 import io.github.matyrobbrt.curseforgeapi.util.Utils;
 import ovh.paulem.fjc.flow.ModrinthMod;
 import ovh.paulem.fjc.flow.SelectState;
-import ovh.paulem.fjc.gui.Main;
+import ovh.paulem.fjc.Main;
 import ovh.paulem.fjc.gui.components.PropertiesViewerPopup;
 import ovh.paulem.fjc.utils.JsonUtils;
 import ovh.paulem.fjc.utils.ManipulationUtils;
@@ -30,7 +30,6 @@ import org.jetbrains.annotations.Nullable;
 
 import java.io.IOException;
 import java.net.URISyntaxException;
-import java.util.Arrays;
 import java.util.List;
 
 public class ModrinthContainer extends SearchContainer {

@@ -12,8 +12,8 @@ import org.jetbrains.annotations.Nullable;
 import java.io.*;
 import java.lang.reflect.Type;
 
-import static ovh.paulem.fjc.gui.Main.jsonContent;
-import static ovh.paulem.fjc.gui.Main.updateList;
+import static ovh.paulem.fjc.Main.jsonContent;
+import static ovh.paulem.fjc.Main.updateList;
 import static ovh.paulem.fjc.utils.FileUtils.getActualJar;
 
 public class JsonUtils {

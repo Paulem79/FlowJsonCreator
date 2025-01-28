@@ -5,7 +5,7 @@ import io.github.matyrobbrt.curseforgeapi.schemas.mod.Mod;
 import io.github.matyrobbrt.curseforgeapi.util.CurseForgeException;
 import org.jetbrains.annotations.Nullable;
 
-import static ovh.paulem.fjc.gui.Main.cfApi;
+import static ovh.paulem.fjc.Main.cfApi;
 
 public class CFUtils {
     @Nullable

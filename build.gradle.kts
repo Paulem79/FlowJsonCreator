@@ -11,7 +11,7 @@ plugins {
 }
 
 group = "ovh.paulem.fjc"
-version = "1.3"
+version = "1.3.1"
 
 repositories {
     mavenCentral()
@@ -48,7 +48,7 @@ dependencies {
 }
 
 application {
-    mainClass.set("ovh.paulem.fjc.gui.Main")
+    mainClass.set("$group.Main")
 }
 
 tasks.withType<JavaCompile>().configureEach {
@@ -71,7 +71,7 @@ val jvmOpts = listOf("-Dfile.encoding=UTF-8", "--add-exports=javafx.graphics/com
 tasks.withType<JPackageTask>().configureEach {
     dependsOn(tasks.shadowJar)
 
-    appName = "FlowJsonCreator"
+    appName = rootProject.name
     appVersion = project.version.toString()
     vendor = "Paulem"
     copyright = "Copyright (c) 2025 Paulem"
@@ -85,7 +85,7 @@ tasks.withType<JPackageTask>().configureEach {
 
 var infra = ""
 tasks.register<JPackageTask>("zipjpackage") {
-    finalizedBy("zipPackage")
+    group = tasks.jpackage.get().group
 
     type = ImageType.APP_IMAGE
 
@@ -94,19 +94,22 @@ tasks.register<JPackageTask>("zipjpackage") {
     }
 
     mac {
-        icon = "icons/icons.icns"
+        icon = "src/main/resources/assets/icons.icns"
         infra = "macos"
     }
 
     windows {
-        icon = "icons/icons.ico"
+        icon = "src/main/resources/assets/icons.ico"
 
         winConsole = true
         infra = "windows"
     }
+
+    finalizedBy("renameZip")
 }
 
-tasks.register<Zip>("zipPackage") {
+tasks.register<Zip>("renameZip") {
+    group = tasks.jpackage.get().group
     archiveFileName.set(infra + "-FlowJsonCreator-" + project.version + ".zip")
     destinationDirectory.set(layout.projectDirectory.dir("dist"))
 
@@ -119,13 +122,13 @@ tasks.jpackage {
     }
 
     mac {
-        icon = "icons/icons.icns"
+        icon = "src/main/resources/assets/icons.icns"
 
         type = ImageType.DMG
     }
 
     windows {
-        icon = "icons/icons.ico"
+        icon = "src/main/resources/assets/icons.ico"
 
         type = ImageType.MSI
 
