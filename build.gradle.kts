@@ -33,7 +33,7 @@ dependencies {
 
     // UI
     implementation("io.github.mkpaz:atlantafx-base:2.+")
-    implementation("com.github.Dansoftowner:FXTaskbarProgressBar:v11.4")
+    implementation("com.github.Dansoftowner:FXTaskbarProgressBar:8.4")
 
     // Core
     implementation("com.google.guava:guava:33.4.0-jre")
