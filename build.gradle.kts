@@ -66,6 +66,8 @@ java {
     }
 }
 
+val jvmOpts = listOf("-Dfile.encoding=UTF-8", "--add-exports=javafx.graphics/com.sun.glass.ui=ALL-UNNAMED", "--add-opens=javafx.graphics/javafx.scene.layout=ALL-UNNAMED")
+
 tasks.withType<JPackageTask>().configureEach {
     dependsOn(tasks.shadowJar)
 
@@ -78,7 +80,7 @@ tasks.withType<JPackageTask>().configureEach {
     input = "build/libs"
     mainJar = tasks.shadowJar.get().archiveFileName.get()
     mainClass = application.mainClass.get()
-    javaOptions = listOf("-Dfile.encoding=UTF-8", "--add-exports=javafx.graphics/com.sun.glass.ui=ALL-UNNAMED")
+    javaOptions = jvmOpts
 }
 
 var infra = ""
@@ -170,7 +172,7 @@ tasks.register<JavaExec>("runShadowJar") {
 
     classpath = files(tasks.shadowJar.get().archiveFile)
     setExecutable(javaPath)
-    jvmArgs("--add-exports=javafx.graphics/com.sun.glass.ui=ALL-UNNAMED")
+    jvmArgs(jvmOpts)
 
     finalizedBy(tasks.clean)
 }
