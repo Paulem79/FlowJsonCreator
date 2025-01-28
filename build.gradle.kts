@@ -44,7 +44,7 @@ dependencies {
     implementation("net.sf.jopt-simple:jopt-simple:6.0-alpha-3")
 
     // Annotations
-    implementation("org.jetbrains:annotations:24.+")
+    implementation("org.jetbrains:annotations:26.+")
 }
 
 application {
