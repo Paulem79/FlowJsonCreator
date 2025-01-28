@@ -29,7 +29,7 @@ dependencies {
     implementation("io.github.matyrobbrt:curseforgeapi:2.+")
 
     // Remove annoying warnings for slf4j
-    implementation("org.slf4j:slf4j-simple:1.7.36")
+    implementation("org.slf4j:slf4j-simple:2.0.16")
 
     // UI
     implementation("io.github.mkpaz:atlantafx-base:2.+")
