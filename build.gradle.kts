@@ -26,7 +26,7 @@ repositories {
 dependencies {
     // API dependencies
     implementation("ovh.paulem:modrinthapi:1.+")
-    implementation("io.github.matyrobbrt:curseforgeapi:1.+")
+    implementation("io.github.matyrobbrt:curseforgeapi:2.+")
 
     // Remove annoying warnings for slf4j
     implementation("org.slf4j:slf4j-simple:1.7.36")
