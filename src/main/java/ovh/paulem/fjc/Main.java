@@ -2,6 +2,7 @@ package ovh.paulem.fjc;
 
 import atlantafx.base.theme.PrimerDark;
 import io.github.matyrobbrt.curseforgeapi.CurseForgeAPI;
+import javafx.scene.image.Image;
 import ovh.paulem.fjc.gui.components.PropertiesViewerPopup;
 import ovh.paulem.fjc.gui.content.containers.CurseforgeContainer;
 import ovh.paulem.fjc.flow.Mod;
@@ -67,6 +68,9 @@ public class Main extends Application {
         Application.setUserAgentStylesheet(new PrimerDark().getUserAgentStylesheet());
 
         stage.setTitle("FlowJsonCreator v1.3");
+        stage.setFullScreen(false);
+        stage.centerOnScreen();
+        stage.getIcons().add(new Image("assets/icons.png"));
 
         mainGrid = new GridPane();
         mainGrid.setAlignment(Pos.CENTER);
