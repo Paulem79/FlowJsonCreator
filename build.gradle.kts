@@ -36,7 +36,7 @@ dependencies {
     implementation("com.github.Dansoftowner:FXTaskbarProgressBar:v11.4")
 
     // Core
-    implementation("com.google.guava:guava:33.4.7-android")
+    implementation("com.google.guava:guava:33.4.7-jre")
     implementation("com.google.code.gson:gson:2.+")
     implementation("javax.xml.bind:jaxb-api:2.4.0-b180830.0359")
 
