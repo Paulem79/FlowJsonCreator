@@ -139,7 +139,7 @@ public class ModrinthContainer extends SearchContainer {
                             .filter(version -> version.id().equals(versionId))
                             .findFirst()
                             .ifPresent(version -> {
-                                JsonUtils.addMod(new ModrinthMod(version.projectId(), version.versionNumber()));
+                                JsonUtils.addMod(new ModrinthMod(version.projectId(), version.versionNumber(), version.id()));
                             });
                 }
             } else if(mouseEvent.getButton().equals(MouseButton.SECONDARY)) {
