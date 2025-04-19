@@ -122,7 +122,9 @@ public class ModrinthContainer extends SearchContainer {
                         ObservableList<String> items = FXCollections.observableArrayList();
 
                         for (Version version : versions) {
-                            VersionFile primaryFile = version.files().stream().filter(VersionFile::primary).findFirst().orElse(version.files().get(0));
+                            VersionFile primaryFile = version.files()
+                                    .stream().filter(VersionFile::primary).findFirst()
+                                    .orElse(version.files().get(0));
                             items.add(primaryFile.filename() + " - " + version.id());
                         }
 

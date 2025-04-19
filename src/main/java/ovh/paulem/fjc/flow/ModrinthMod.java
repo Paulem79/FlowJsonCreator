@@ -4,7 +4,6 @@ public class ModrinthMod implements Mod
 {
     private String projectReference = "";
     private String versionNumber = "";
-    private String versionId = "";
 
     /**
      * Construct a new ModrinthVersionInfo object.
@@ -17,17 +16,6 @@ public class ModrinthMod implements Mod
         this.versionNumber = versionNumber.trim();
     }
 
-    /**
-     * Construct a new ModrinthVersionInfo object.
-     * This constructor doesn't need a project reference because
-     * we can access the version without any project information.
-     * @param versionId the version id.
-     */
-    public ModrinthMod(String versionId)
-    {
-        this.versionId = versionId.trim();
-    }
-
     public String getProjectReference()
     {
         return this.projectReference;
@@ -36,10 +24,5 @@ public class ModrinthMod implements Mod
     public String getVersionNumber()
     {
         return this.versionNumber;
-    }
-
-    public String getVersionId()
-    {
-        return this.versionId;
     }
 }

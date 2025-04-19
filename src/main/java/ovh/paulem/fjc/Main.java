@@ -67,7 +67,7 @@ public class Main extends Application {
     public void start(Stage stage) {
         Application.setUserAgentStylesheet(new PrimerDark().getUserAgentStylesheet());
 
-        stage.setTitle("FlowJsonCreator v1.3");
+        stage.setTitle("FlowJsonCreator v1.3.2");
         stage.setFullScreen(false);
         stage.centerOnScreen();
         stage.getIcons().add(new Image("assets/icons.png"));
