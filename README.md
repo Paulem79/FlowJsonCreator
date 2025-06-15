@@ -11,7 +11,6 @@ Un utilitaire permettant de générer le fichier mods.json pour FlowUpdater.
 
 ---
 ## Utiliser le projet
-**Vous aurez besoin de Java 17 ou plus pour lancer le projet !**<br>
 Rendez vous [ici](https://github.com/Paulem79/FlowJsonCreator/releases/latest) pour obtenir la dernière version, puis, installez-la et profitez !
 
 ### Arguments de lancement
@@ -26,6 +25,10 @@ Vous pouvez l'obtenir en suivant [ce tutoriel](https://support.curseforge.com/en
 Ensuite, compilez le projet avec :
 ```shell
 ./gradlew shadowJar
+```
+ou créez-le avec jpackage :
+```shell
+./gradlew jpackage
 ```
 
 Puis exécutez le fichier jar sorti dans `build/libs/FlowJsonCreator-x.x.jar` avec Java 17 ou plus :
