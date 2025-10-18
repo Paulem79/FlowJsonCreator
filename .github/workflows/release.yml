@@ -1,9 +1,12 @@
 name: "Publish"
 
 on:
-  push:
-    tags:
-      - "v*"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version'
+        required: true
+        default: '1.0.0'
 
 jobs:
   build:
@@ -64,9 +67,9 @@ jobs:
       - uses: "marvinpinto/action-automatic-releases@latest"
         with:
           repo_token: "${{ secrets.GITHUB_TOKEN }}"
-          automatic_release_tag: "${{ github.ref_name }}"
+          automatic_release_tag: "v${{ github.event.inputs.version }}"
           prerelease: false
-          title: "Release ${{ github.ref_name }}"
+          title: "Release v${{ github.event.inputs.version }}"
           files: |
             dist/*.deb
             dist/*.dmg
