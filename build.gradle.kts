@@ -10,8 +10,8 @@ plugins {
     id("org.panteleyev.jpackageplugin") version "1.7.6"
 }
 
-group = "ovh.paulem.fjc"
-version = "1.3.2"
+group = "net.paulem.fjc"
+version = "1.4"
 
 repositories {
     mavenCentral()
@@ -19,7 +19,7 @@ repositories {
 
     maven { url = uri("https://jitpack.io") }
     maven {
-        url = uri("https://maven.paulem.ovh/releases")
+        url = uri("https://maven.paulem.net/releases")
     }
 }
 
@@ -52,7 +52,7 @@ application {
 }
 
 tasks.withType<JavaCompile>().configureEach {
-    JavaVersion.VERSION_17.toString().also {
+    JavaVersion.VERSION_21.toString().also {
         sourceCompatibility = it
         targetCompatibility = it
     }
@@ -61,7 +61,7 @@ tasks.withType<JavaCompile>().configureEach {
 
 java {
     toolchain {
-        languageVersion = JavaLanguageVersion.of(17)
+        languageVersion = JavaLanguageVersion.of(21)
         vendor = JvmVendorSpec.BELLSOFT
     }
 }

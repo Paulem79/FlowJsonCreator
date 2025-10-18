@@ -1,5 +1,4 @@
 module FlowJsonCreator {
-    requires atlantafx.base;
     requires java.xml.bind;
     requires javafx.controls;
     requires joptsimple;
@@ -9,4 +8,5 @@ module FlowJsonCreator {
     requires java.desktop;
     requires curseforgeapi;
     requires com.google.gson;
+    requires atlantafx.base;
 }
