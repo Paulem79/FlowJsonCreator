@@ -100,11 +100,12 @@ public class CurseforgeContainer extends SearchContainer {
 
             @Nullable String selectedItem = list.getSelectionModel().getSelectedItem();
             if(selectedItem == null || selectedItem.equals("Aucun résultat")) return;
+            String[] split = selectedItem.split(" - ");
 
             if (mouseEvent.getButton() == MouseButton.PRIMARY && mouseEvent.getClickCount() == 2) {
 
                 if(selectState == SelectState.MOD) {
-                    String modId = selectedItem.split(" - ")[1];
+                    String modId = split[split.length - 1];
 
                     selectState = SelectState.FILES;
 
@@ -135,7 +136,7 @@ public class CurseforgeContainer extends SearchContainer {
                         throw new RuntimeException(e);
                     }
                 } else if(selectState == SelectState.FILES) {
-                    String fileId = selectedItem.split(" - ")[1];
+                    String fileId = split[split.length - 1];
 
                     modFiles.stream()
                             .filter(file -> file.id() == Integer.parseInt(fileId))
@@ -148,11 +149,11 @@ public class CurseforgeContainer extends SearchContainer {
 
                 @Nullable Object object = null;
                 if(selectState == SelectState.MOD) {
-                    String modId = selectedItem.split(" - ")[1];
+                    String modId = split[split.length - 1];
                     object = CFUtils.getModFromId(Integer.parseInt(modId));
                 } else if(selectState == SelectState.FILES) {
                     object = modFiles.stream()
-                            .filter(file -> file.displayName().equals(selectedItem.split(" - ")[0]))
+                            .filter(file -> file.displayName().equals(String.join(" - ", Arrays.copyOf(split, split.length - 1))))
                             .findFirst()
                             .orElse(null);
                 }

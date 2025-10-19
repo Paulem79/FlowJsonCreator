@@ -30,6 +30,7 @@ import org.jetbrains.annotations.Nullable;
 
 import java.io.IOException;
 import java.net.URISyntaxException;
+import java.util.Arrays;
 import java.util.List;
 
 public class ModrinthContainer extends SearchContainer {
@@ -98,11 +99,12 @@ public class ModrinthContainer extends SearchContainer {
         list.setOnMouseClicked(mouseEvent -> {
             @Nullable String selectedItem = list.getSelectionModel().getSelectedItem();
             if(selectedItem == null) return;
+            String[] split = selectedItem.split(" - ");
 
             if (mouseEvent.getButton() == MouseButton.PRIMARY && mouseEvent.getClickCount() == 2) {
 
                 if(selectState == SelectState.MOD) {
-                    String modId = selectedItem.split(" - ")[1];
+                    String modId = split[split.length - 1];
 
                     selectState = SelectState.FILES;
 
@@ -133,7 +135,7 @@ public class ModrinthContainer extends SearchContainer {
                         throw new RuntimeException(e);
                     }
                 } else if(selectState == SelectState.FILES) {
-                    String versionId = selectedItem.split(" - ")[1];
+                    String versionId = split[split.length - 1];
 
                     modFiles.stream()
                             .filter(version -> version.id().equals(versionId))
@@ -146,13 +148,14 @@ public class ModrinthContainer extends SearchContainer {
 
                 @Nullable Object object = null;
                 if(selectState == SelectState.MOD) {
-                    String modSlug = selectedItem.split(" - ")[1];
+                    String modSlug = split[split.length - 1];
                     object = ModrinthUtils.getModFromSlug(modSlug);
                 } else if(selectState == SelectState.FILES) {
                     object = modFiles.stream()
                             .filter(version -> {
                                 VersionFile primaryFile = version.files().stream().filter(VersionFile::primary).findFirst().orElse(version.files().get(0));
-                                return primaryFile.filename().equals(selectedItem.split(" - ")[0]);
+                                // All except the last part
+                                return primaryFile.filename().equals(String.join(" - ", Arrays.copyOf(split, split.length - 1)));
                             })
                             .findFirst()
                             .orElse(null);

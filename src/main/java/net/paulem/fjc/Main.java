@@ -57,7 +57,8 @@ import net.paulem.fjc.flow.mod.ModrinthMod;
 public class Main extends Application {
     public static @Nullable String CF_API_KEY;
 
-    public static final Modrinth MODRINTH = new Modrinth(null, "paulem", "FlowJsonCreator", "1.4");
+    public static final String VERSION = "1.4.1";
+    public static final Modrinth MODRINTH = new Modrinth(null, "paulem", "FlowJsonCreator", VERSION);
 
     public static ModsJson jsonContent;
 
@@ -114,7 +115,7 @@ public class Main extends Application {
     public void start(Stage stage) {
         Application.setUserAgentStylesheet(new PrimerDark().getUserAgentStylesheet());
 
-        stage.setTitle("FlowJsonCreator v1.4");
+        stage.setTitle("FlowJsonCreator v" + VERSION);
         stage.setFullScreen(false);
         stage.centerOnScreen();
         stage.getIcons().add(new Image("assets/icons.png"));
