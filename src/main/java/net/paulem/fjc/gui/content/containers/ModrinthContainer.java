@@ -133,8 +133,21 @@ public class ModrinthContainer extends SearchContainer {
                         list.setItems(items);
                     } catch (URISyntaxException | IOException e) {
                         throw new RuntimeException(e);
+                    } catch (IllegalArgumentException e) {
+                        // La librairie modrinthapi ne connaît pas un type de fichier renvoyé par l'API
+                        // (ex: nouveau type comme "sources-jar"). On l'affiche proprement au lieu de crasher.
+                        modFiles = null;
+                        javafx.application.Platform.runLater(() -> {
+                            javafx.scene.control.Alert alert = new javafx.scene.control.Alert(javafx.scene.control.Alert.AlertType.WARNING);
+                            alert.setTitle("Type de fichier non supporté");
+                            alert.setHeaderText("Impossible de lister les versions de ce mod");
+                            alert.setContentText("L'API Modrinth a renvoyé un type de fichier inconnu de cette version de l'application (" + e.getMessage() + "). Réessaie plus tard ou signale ce mod.");
+                            alert.showAndWait();
+                        });
                     }
                 } else if(selectState == SelectState.FILES) {
+                    if (modFiles == null) return;
+
                     String versionId = split[split.length - 1];
 
                     modFiles.stream()
@@ -150,7 +163,7 @@ public class ModrinthContainer extends SearchContainer {
                 if(selectState == SelectState.MOD) {
                     String modSlug = split[split.length - 1];
                     object = ModrinthUtils.getModFromSlug(modSlug);
-                } else if(selectState == SelectState.FILES) {
+                } else if(selectState == SelectState.FILES && modFiles != null) {
                     object = modFiles.stream()
                             .filter(version -> {
                                 VersionFile primaryFile = version.files().stream().filter(VersionFile::primary).findFirst().orElse(version.files().get(0));

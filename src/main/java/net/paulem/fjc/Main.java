@@ -16,6 +16,9 @@ import ovh.paulem.modrinthapi.Modrinth;
 import javafx.application.Application;
 import javafx.application.Platform;
 import javafx.collections.FXCollections;
+import javafx.collections.ObservableList;
+import javafx.collections.transformation.FilteredList;
+import javafx.collections.transformation.SortedList;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Scene;
@@ -25,7 +28,11 @@ import javafx.scene.control.Label;
 import javafx.scene.input.MouseButton;
 import javafx.scene.layout.GridPane;
 import javafx.scene.layout.HBox;
+import javafx.scene.layout.Priority;
+import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
+import javafx.scene.paint.Color;
+import javafx.scene.shape.Circle;
 import javafx.scene.text.Font;
 import javafx.scene.text.FontWeight;
 import javafx.scene.text.Text;
@@ -57,7 +64,7 @@ import net.paulem.fjc.flow.mod.ModrinthMod;
 public class Main extends Application {
     public static @Nullable String CF_API_KEY;
 
-    public static final String VERSION = "1.4.1";
+    public static final String VERSION = "1.4.2";
     public static final Modrinth MODRINTH = new Modrinth(null, "paulem", "FlowJsonCreator", VERSION);
 
     public static ModsJson jsonContent;
@@ -65,6 +72,12 @@ public class Main extends Application {
     public static ListView<String> list;
     @Nullable
     public static CurseForgeAPI cfApi = null;
+
+    // --- Search / filter / display infra for the main mods list ---
+    private static final ObservableList<String> masterItems = FXCollections.observableArrayList();
+    private static FilteredList<String> filteredItems;
+    private static final javafx.beans.property.SimpleStringProperty searchQuery = new javafx.beans.property.SimpleStringProperty("");
+    private static final javafx.beans.property.SimpleStringProperty categoryFilter = new javafx.beans.property.SimpleStringProperty("Tous");
 
     public GridPane mainGrid;
     public GridPane subGrid;
@@ -92,6 +105,30 @@ public class Main extends Application {
         }
     }
 
+    /** Détermine la catégorie d'un item de la liste à partir de son préfixe. */
+    private static String categoryOf(String item) {
+        if (item.startsWith("CF ")) return "CurseForge";
+        if (item.startsWith("MOD ")) return "Modrinth";
+        return "URL";
+    }
+
+    /** Nom "propre" à afficher (sans le préfixe technique ni les ids). */
+    private static String friendlyName(String item) {
+        String category = categoryOf(item);
+        String withoutPrefix = category.equals("URL") ? item : item.substring(item.indexOf(' ') + 1);
+        int dash = withoutPrefix.indexOf(" - ");
+        return dash >= 0 ? withoutPrefix.substring(0, dash) : withoutPrefix;
+    }
+
+    private static boolean matchesFilter(String item) {
+        String cat = categoryFilter.get();
+        if (cat != null && !cat.equals("Tous") && !categoryOf(item).equals(cat)) return false;
+
+        String query = searchQuery.get();
+        if (query == null || query.isBlank()) return true;
+        return item.toLowerCase().contains(query.toLowerCase());
+    }
+
     private static synchronized void ensureExecutorsStarted() {
         if (executorsStarted) return;
         bgExecutor = Executors.newFixedThreadPool(Math.max(2, Runtime.getRuntime().availableProcessors() / 2));
@@ -106,7 +143,7 @@ public class Main extends Application {
             // Snapshot thread-safe
             List<String> snapshot = List.copyOf(stagedItems);
             if (list == null) return;
-            Platform.runLater(() -> list.setItems(FXCollections.observableArrayList(snapshot)));
+            Platform.runLater(() -> masterItems.setAll(snapshot));
         }, 0, 333, TimeUnit.MILLISECONDS);
         executorsStarted = true;
     }
@@ -190,8 +227,79 @@ public class Main extends Application {
             }
         });
 
+        // ------- Barre de recherche / filtre par catégorie -------
+        HBox filterBox = new HBox(10);
+        modsJsonBox.getChildren().add(filterBox);
+
+        TextField modsSearchField = new TextField();
+        modsSearchField.setPromptText("Rechercher un mod...");
+        HBox.setHgrow(modsSearchField, Priority.ALWAYS);
+        modsSearchField.textProperty().addListener((obs, oldV, newV) -> {
+            searchQuery.set(newV);
+            if (filteredItems != null) filteredItems.setPredicate(Main::matchesFilter);
+        });
+        filterBox.getChildren().add(modsSearchField);
+
+        ComboBox<String> categoryComboBox = new ComboBox<>();
+        categoryComboBox.getItems().addAll("Tous", "Modrinth", "CurseForge", "URL");
+        categoryComboBox.setValue("Tous");
+        categoryComboBox.setOnAction(e -> {
+            categoryFilter.set(categoryComboBox.getValue());
+            if (filteredItems != null) filteredItems.setPredicate(Main::matchesFilter);
+        });
+        filterBox.getChildren().add(categoryComboBox);
+        // ------- FIN barre de recherche -------
+
+        Label countLabel = new Label();
+        modsJsonBox.getChildren().add(countLabel);
+
         list = new ListView<>();
         modsJsonBox.getChildren().add(list);
+
+        filteredItems = new FilteredList<>(masterItems, Main::matchesFilter);
+        SortedList<String> sortedItems = new SortedList<>(filteredItems, String.CASE_INSENSITIVE_ORDER);
+        list.setItems(sortedItems);
+
+        countLabel.textProperty().bind(javafx.beans.binding.Bindings.size(sortedItems).asString("%d mod(s)"));
+
+        // Cellules personnalisées : pastille de couleur par catégorie + nom lisible
+        list.setCellFactory(lv -> new ListCell<>() {
+            private final Circle badge = new Circle(5);
+            private final Label label = new Label();
+            private final HBox graphic = new HBox(8, badge, label);
+
+            {
+                graphic.setAlignment(Pos.CENTER_LEFT);
+            }
+
+            @Override
+            protected void updateItem(String item, boolean empty) {
+                super.updateItem(item, empty);
+                if (empty || item == null) {
+                    setGraphic(null);
+                    setTooltip(null);
+                    return;
+                }
+
+                String category = categoryOf(item);
+                Color color = switch (category) {
+                    case "Modrinth" -> Color.web("#1bd96a");
+                    case "CurseForge" -> Color.web("#f16436");
+                    default -> Color.web("#5aa9e6"); // URL
+                };
+                badge.setFill(color);
+
+                boolean loading = item.contains("(chargement...)");
+                boolean notFound = item.contains("(introuvable)");
+                String display = "[" + category + "] " + friendlyName(item);
+                if (loading) display += " ⏳";
+                if (notFound) display += " ⚠";
+
+                label.setText(display);
+                setGraphic(graphic);
+                setTooltip(new Tooltip(item));
+            }
+        });
 
         // Démarre les exécutors avant la première mise à jour
         ensureExecutorsStarted();
@@ -398,7 +506,32 @@ public class Main extends Application {
         uiDirty.set(true);
     }
 
+    /**
+     * Handle any uncaught exception (JavaFX thread or background thread) by showing
+     * an alert instead of letting the whole application crash.
+     */
+    private static void handleUncaught(Thread thread, Throwable throwable) {
+        debug("Erreur non interceptée sur le thread " + thread.getName(), throwable);
+
+        Runnable showAlert = () -> {
+            Alert alert = new Alert(Alert.AlertType.ERROR);
+            alert.setTitle("Erreur inattendue");
+            alert.setHeaderText("Une erreur est survenue, mais l'application continue de fonctionner");
+            String message = throwable.getMessage();
+            alert.setContentText(message != null ? message : throwable.getClass().getSimpleName());
+            alert.showAndWait();
+        };
+
+        if (Platform.isFxApplicationThread()) {
+            showAlert.run();
+        } else {
+            Platform.runLater(showAlert);
+        }
+    }
+
     public static void main(String[] args) throws IOException {
+        Thread.setDefaultUncaughtExceptionHandler(Main::handleUncaught);
+
         createJsonFile();
         jsonContent = getJsonContent();
 
