@@ -4,7 +4,7 @@ import org.panteleyev.jpackage.JPackageTask
 
 plugins {
     id("idea")
-    id("com.gradleup.shadow") version "9.+"
+    id("com.gradleup.shadow") version "9.1.0"
     id("java")
     id("application")
     id("org.panteleyev.jpackageplugin") version "1.7.6"
@@ -34,6 +34,8 @@ dependencies {
     // UI
     implementation("io.github.mkpaz:atlantafx-base:2.+")
     implementation("com.github.Dansoftowner:FXTaskbarProgressBar:v11.4")
+    implementation("org.kordamp.ikonli:ikonli-javafx:12.+")
+    implementation("org.kordamp.ikonli:ikonli-material2-pack:12.+")
 
     // Core
     implementation("com.google.guava:guava:33.5.0-jre")

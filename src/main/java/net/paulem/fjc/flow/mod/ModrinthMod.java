@@ -1,5 +1,7 @@
 package net.paulem.fjc.flow.mod;
 
+import java.util.Objects;
+
 public class ModrinthMod implements Mod
 {
     private String projectReference = "";
@@ -30,5 +32,19 @@ public class ModrinthMod implements Mod
 
     public String getVersionId() {
         return versionId;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (!(o instanceof ModrinthMod other)) return false;
+        return projectReference.equals(other.projectReference)
+                && versionNumber.equals(other.versionNumber)
+                && versionId.equals(other.versionId);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(projectReference, versionNumber, versionId);
     }
 }

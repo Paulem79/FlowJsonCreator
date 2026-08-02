@@ -4,6 +4,7 @@ import net.paulem.fjc.utils.JsonUtils;
 import javafx.application.Platform;
 import javafx.event.ActionEvent;
 import javafx.geometry.Pos;
+import javafx.scene.control.Alert;
 import javafx.scene.control.Label;
 import javafx.scene.control.TextField;
 import javafx.scene.layout.GridPane;
@@ -33,14 +34,24 @@ public class UrlContainer extends SearchContainer {
         getGrid().add(urlLabel, 0, 0);
 
         urlField = new TextField();
+        urlField.setPromptText("https://.../mon-mod.jar");
         getHbBtn().getChildren().add(urlField);
 
         addFinishButton(0, 1, 2, 1, Pos.CENTER, 10);
+        submitOnEnter(urlField);
     }
 
     @Override
     protected void finishButtonAction(ActionEvent event) {
         String jarUrl = urlField.getText();
+        if (jarUrl == null || jarUrl.isBlank()) {
+            Alert alert = new Alert(Alert.AlertType.WARNING);
+            alert.setTitle("URL manquante");
+            alert.setHeaderText("Merci de renseigner une URL de fichier jar.");
+            alert.showAndWait();
+            return;
+        }
+
         String[] split = jarUrl.split("/");
 
         try {
@@ -51,7 +62,11 @@ public class UrlContainer extends SearchContainer {
                 Platform.runLater(() -> urlField.clear());
             });
         } catch (IOException | NoSuchAlgorithmException e) {
-            throw new RuntimeException(e);
+            Alert alert = new Alert(Alert.AlertType.ERROR);
+            alert.setTitle("Erreur");
+            alert.setHeaderText("Impossible de télécharger ce fichier");
+            alert.setContentText(e.getMessage());
+            alert.showAndWait();
         }
     }
 }
