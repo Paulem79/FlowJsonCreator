@@ -8,6 +8,7 @@ import net.paulem.fjc.flow.mod.UrlMod;
 
 import java.lang.reflect.Type;
 import java.util.List;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 public class ModsJson {
     public static final Type MODS_TYPE = new TypeToken<ModsJson>() {
@@ -18,9 +19,26 @@ public class ModsJson {
     public List<ModrinthMod> modrinthMods;
 
     public ModsJson() {
-        this.mods = List.of();
-        this.curseFiles = List.of();
-        this.modrinthMods = List.of();
+        this.mods = new CopyOnWriteArrayList<>();
+        this.curseFiles = new CopyOnWriteArrayList<>();
+        this.modrinthMods = new CopyOnWriteArrayList<>();
+    }
+
+    /**
+     * Gson bypasses this constructor's field assignments for keys present in the JSON,
+     * but leaves them untouched (possibly null) for missing/malformed keys. Call this
+     * right after deserialization to guarantee every list is a real, mutable, thread-safe
+     * collection, whatever the source JSON looked like.
+     */
+    public void normalize() {
+        if (this.mods == null) this.mods = new CopyOnWriteArrayList<>();
+        else if (!(this.mods instanceof CopyOnWriteArrayList<?>)) this.mods = new CopyOnWriteArrayList<>(this.mods);
+
+        if (this.curseFiles == null) this.curseFiles = new CopyOnWriteArrayList<>();
+        else if (!(this.curseFiles instanceof CopyOnWriteArrayList<?>)) this.curseFiles = new CopyOnWriteArrayList<>(this.curseFiles);
+
+        if (this.modrinthMods == null) this.modrinthMods = new CopyOnWriteArrayList<>();
+        else if (!(this.modrinthMods instanceof CopyOnWriteArrayList<?>)) this.modrinthMods = new CopyOnWriteArrayList<>(this.modrinthMods);
     }
 
     public void addMod(Mod mod) {
@@ -41,5 +59,10 @@ public class ModsJson {
         } else if (mod instanceof ModrinthMod modrinthMod) {
             this.modrinthMods.remove(modrinthMod);
         }
+    }
+
+    /** Total number of mods across all categories. */
+    public int size() {
+        return this.mods.size() + this.curseFiles.size() + this.modrinthMods.size();
     }
 }

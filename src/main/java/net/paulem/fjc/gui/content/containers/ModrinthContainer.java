@@ -1,6 +1,7 @@
 package net.paulem.fjc.gui.content.containers;
 
 import io.github.matyrobbrt.curseforgeapi.util.Utils;
+import javafx.application.Platform;
 import net.paulem.fjc.flow.mod.ModrinthMod;
 import net.paulem.fjc.flow.SelectState;
 import net.paulem.fjc.Main;
@@ -18,6 +19,7 @@ import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.event.ActionEvent;
 import javafx.geometry.Insets;
+import javafx.scene.control.Alert;
 import javafx.scene.control.ComboBox;
 import javafx.scene.control.Label;
 import javafx.scene.control.ListView;
@@ -60,6 +62,7 @@ public class ModrinthContainer extends SearchContainer {
         modNameBox.getChildren().add(modNameLabel);
 
         modNameField = new TextField();
+        modNameField.setPromptText("Nom du mod ou slug Modrinth");
         modNameBox.getChildren().add(modNameField);
         // ------- END NAME -------
 
@@ -73,6 +76,7 @@ public class ModrinthContainer extends SearchContainer {
         versionBox.getChildren().add(versionLabel);
 
         versionField = new TextField();
+        versionField.setPromptText("ex: 1.20.1 (optionnel)");
         versionBox.getChildren().add(versionField);
         // ------- END VERSION -------
 
@@ -95,6 +99,8 @@ public class ModrinthContainer extends SearchContainer {
         getGrid().add(list, 0, 4);
 
         addSearchButton(0, 3);
+        submitOnEnter(modNameField);
+        submitOnEnter(versionField);
 
         list.setOnMouseClicked(mouseEvent -> {
             @Nullable String selectedItem = list.getSelectionModel().getSelectedItem();
@@ -105,46 +111,7 @@ public class ModrinthContainer extends SearchContainer {
 
                 if(selectState == SelectState.MOD) {
                     String modId = split[split.length - 1];
-
-                    selectState = SelectState.FILES;
-
-                    try {
-                        ListVersions listVersions = Main.MODRINTH.listVersions(modId);
-
-                        List<Version> versions = listVersions.versions()
-                                .stream()
-                                .filter(version -> {
-                                    boolean matchGameVersion = versionField.getText().isEmpty() || version.gameVersions().contains(versionField.getText());
-                                    boolean matchLoader = (loaderComboBox.getValue() == null || loaderComboBox.getValue().equalsIgnoreCase("any")) || version.loaders().contains(loaderComboBox.getValue().toLowerCase());
-
-                                    return matchGameVersion && matchLoader;
-                                })
-                                .toList();
-                        modFiles = versions;
-                        ObservableList<String> items = FXCollections.observableArrayList();
-
-                        for (Version version : versions) {
-                            VersionFile primaryFile = version.files()
-                                    .stream().filter(VersionFile::primary).findFirst()
-                                    .orElse(version.files().get(0));
-                            items.add(primaryFile.filename() + " - " + version.id());
-                        }
-
-                        list.setItems(items);
-                    } catch (URISyntaxException | IOException e) {
-                        throw new RuntimeException(e);
-                    } catch (IllegalArgumentException e) {
-                        // La librairie modrinthapi ne connaît pas un type de fichier renvoyé par l'API
-                        // (ex: nouveau type comme "sources-jar"). On l'affiche proprement au lieu de crasher.
-                        modFiles = null;
-                        javafx.application.Platform.runLater(() -> {
-                            javafx.scene.control.Alert alert = new javafx.scene.control.Alert(javafx.scene.control.Alert.AlertType.WARNING);
-                            alert.setTitle("Type de fichier non supporté");
-                            alert.setHeaderText("Impossible de lister les versions de ce mod");
-                            alert.setContentText("L'API Modrinth a renvoyé un type de fichier inconnu de cette version de l'application (" + e.getMessage() + "). Réessaie plus tard ou signale ce mod.");
-                            alert.showAndWait();
-                        });
-                    }
+                    openVersions(modId);
                 } else if(selectState == SelectState.FILES) {
                     if (modFiles == null) return;
 
@@ -181,28 +148,73 @@ public class ModrinthContainer extends SearchContainer {
         });
     }
 
+    private void openVersions(String modId) {
+        selectState = SelectState.FILES;
+
+        runInBackground(() -> {
+            try {
+                ListVersions listVersions = Main.MODRINTH.listVersions(modId);
+
+                List<Version> versions = listVersions.versions()
+                        .stream()
+                        .filter(version -> {
+                            boolean matchGameVersion = versionField.getText().isEmpty() || version.gameVersions().contains(versionField.getText());
+                            boolean matchLoader = (loaderComboBox.getValue() == null || loaderComboBox.getValue().equalsIgnoreCase("any")) || version.loaders().contains(loaderComboBox.getValue().toLowerCase());
+
+                            return matchGameVersion && matchLoader;
+                        })
+                        .toList();
+                modFiles = versions;
+                ObservableList<String> items = FXCollections.observableArrayList();
+
+                for (Version version : versions) {
+                    VersionFile primaryFile = version.files()
+                            .stream().filter(VersionFile::primary).findFirst()
+                            .orElse(version.files().get(0));
+                    items.add(primaryFile.filename() + " - " + version.id());
+                }
+
+                Platform.runLater(() -> list.setItems(items));
+            } catch (URISyntaxException | IOException e) {
+                throw new RuntimeException(e);
+            } catch (IllegalArgumentException e) {
+                // La librairie modrinthapi ne connaît pas un type de fichier renvoyé par l'API
+                // (ex: nouveau type comme "sources-jar"). On l'affiche proprement au lieu de crasher.
+                modFiles = null;
+                Platform.runLater(() -> {
+                    Alert alert = new Alert(Alert.AlertType.WARNING);
+                    alert.setTitle("Type de fichier non supporté");
+                    alert.setHeaderText("Impossible de lister les versions de ce mod");
+                    alert.setContentText("L'API Modrinth a renvoyé un type de fichier inconnu de cette version de l'application (" + e.getMessage() + "). Réessaie plus tard ou signale ce mod.");
+                    alert.showAndWait();
+                });
+            }
+        });
+    }
+
     @Override
     protected void finishButtonAction(ActionEvent event) {
         String modName = modNameField.getText();
-
         selectState = SelectState.MOD;
 
-        try {
-            // Try to get the mod because it's an id
-            Project mod = ModrinthUtils.getModFromSlug(modName);
+        runInBackground(() -> {
+            try {
+                // Try to get the mod because it's an id
+                Project mod = ModrinthUtils.getModFromSlug(modName);
 
-            if(mod == null) {
+                if(mod == null) {
+                    searchMod(modName);
+                    return;
+                }
+
+                ObservableList<String> items = FXCollections.observableArrayList();
+                items.add(mod.title() + " - " + mod.id());
+
+                Platform.runLater(() -> list.setItems(items));
+            } catch (NumberFormatException err) {
                 searchMod(modName);
-                return;
             }
-
-            ObservableList<String> items = FXCollections.observableArrayList();
-            items.add(mod.title() + " - " + mod.id());
-
-            list.setItems(items);
-        } catch (NumberFormatException err) {
-            searchMod(modName);
-        }
+        });
     }
 
     private void searchMod(String modName) {
@@ -229,7 +241,7 @@ public class ModrinthContainer extends SearchContainer {
                 items.add(mod.title() + " - " + mod.projectId());
             }
 
-            list.setItems(items);
+            Platform.runLater(() -> list.setItems(items));
         } catch (IOException | URISyntaxException e) {
             throw new RuntimeException(e);
         }

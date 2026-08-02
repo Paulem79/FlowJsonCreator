@@ -7,6 +7,7 @@ import io.github.matyrobbrt.curseforgeapi.schemas.mod.Mod;
 import io.github.matyrobbrt.curseforgeapi.schemas.mod.ModLoaderType;
 import io.github.matyrobbrt.curseforgeapi.util.Constants;
 import io.github.matyrobbrt.curseforgeapi.util.CurseForgeException;
+import javafx.application.Platform;
 import net.paulem.fjc.flow.SelectState;
 import net.paulem.fjc.Main;
 import net.paulem.fjc.gui.components.PropertiesViewerPopup;
@@ -59,6 +60,7 @@ public class CurseforgeContainer extends SearchContainer {
         modNameBox.getChildren().add(modNameLabel);
 
         modNameField = new TextField();
+        modNameField.setPromptText("Nom du mod ou ID CurseForge");
         modNameBox.getChildren().add(modNameField);
         // ------- END NAME -------
 
@@ -72,6 +74,7 @@ public class CurseforgeContainer extends SearchContainer {
         versionBox.getChildren().add(versionLabel);
 
         versionField = new TextField();
+        versionField.setPromptText("ex: 1.20.1 (optionnel)");
         versionBox.getChildren().add(versionField);
         // ------- END VERSION -------
 
@@ -94,6 +97,8 @@ public class CurseforgeContainer extends SearchContainer {
         getGrid().add(list, 0, 4);
 
         addSearchButton(0, 3);
+        submitOnEnter(modNameField);
+        submitOnEnter(versionField);
 
         list.setOnMouseClicked(mouseEvent -> {
             if(Main.cfApi == null) return;
@@ -106,35 +111,7 @@ public class CurseforgeContainer extends SearchContainer {
 
                 if(selectState == SelectState.MOD) {
                     String modId = split[split.length - 1];
-
-                    selectState = SelectState.FILES;
-
-                    try {
-                        Response<List<File>> filesResponse = Main.cfApi.getHelper().getModFiles(Integer.parseInt(modId));
-                        if(filesResponse.isEmpty() || filesResponse.get().isEmpty()) {
-                            list.setItems(FXCollections.observableArrayList("Aucun résultat"));
-                        } else {
-                            List<File> files = filesResponse.get();
-                            files = files.stream()
-                                    .filter(version -> {
-                                        boolean matchGameVersion = versionField.getText().isEmpty() || version.gameVersions().contains(versionField.getText());
-                                        boolean matchLoader = (loaderComboBox.getValue() == null || loaderComboBox.getValue().equalsIgnoreCase("any")) || version.gameVersions().contains(ManipulationUtils.capitalize(loaderComboBox.getValue()));
-
-                                        return matchGameVersion && matchLoader;
-                                    })
-                                    .toList();
-                            modFiles = files;
-                            ObservableList<String> items = FXCollections.observableArrayList();
-
-                            for (File file : files) {
-                                items.add(file.displayName() + " - " + file.id());
-                            }
-
-                            list.setItems(items);
-                        }
-                    } catch (CurseForgeException e) {
-                        throw new RuntimeException(e);
-                    }
+                    openFiles(modId);
                 } else if(selectState == SelectState.FILES) {
                     String fileId = split[split.length - 1];
 
@@ -165,30 +142,65 @@ public class CurseforgeContainer extends SearchContainer {
         });
     }
 
+    private void openFiles(String modId) {
+        selectState = SelectState.FILES;
+
+        runInBackground(() -> {
+            try {
+                Response<List<File>> filesResponse = Main.cfApi.getHelper().getModFiles(Integer.parseInt(modId));
+                if (filesResponse.isEmpty() || filesResponse.get().isEmpty()) {
+                    Platform.runLater(() -> list.setItems(FXCollections.observableArrayList("Aucun résultat")));
+                    return;
+                }
+
+                List<File> files = filesResponse.get();
+                files = files.stream()
+                        .filter(version -> {
+                            boolean matchGameVersion = versionField.getText().isEmpty() || version.gameVersions().contains(versionField.getText());
+                            boolean matchLoader = (loaderComboBox.getValue() == null || loaderComboBox.getValue().equalsIgnoreCase("any")) || version.gameVersions().contains(ManipulationUtils.capitalize(loaderComboBox.getValue()));
+
+                            return matchGameVersion && matchLoader;
+                        })
+                        .toList();
+                modFiles = files;
+
+                ObservableList<String> items = FXCollections.observableArrayList();
+                for (File file : files) {
+                    items.add(file.displayName() + " - " + file.id());
+                }
+
+                Platform.runLater(() -> list.setItems(items));
+            } catch (CurseForgeException e) {
+                throw new RuntimeException(e);
+            }
+        });
+    }
+
     @Override
     protected void finishButtonAction(ActionEvent event) {
         if(Main.cfApi == null) return;
 
         String modName = modNameField.getText();
-
         selectState = SelectState.MOD;
 
-        try {
-            // Try to get the mod because it's an id
-            Mod modFromId = CFUtils.getModFromId(Integer.parseInt(modName));
+        runInBackground(() -> {
+            try {
+                // Try to get the mod because it's an id
+                Mod modFromId = CFUtils.getModFromId(Integer.parseInt(modName));
 
-            if(modFromId == null) {
+                if(modFromId == null) {
+                    searchMod(modName);
+                    return;
+                }
+
+                ObservableList<String> items = FXCollections.observableArrayList();
+                items.add(modFromId.name() + " - " + modFromId.id());
+
+                Platform.runLater(() -> list.setItems(items));
+            } catch (NumberFormatException err) {
                 searchMod(modName);
-                return;
             }
-
-            ObservableList<String> items = FXCollections.observableArrayList();
-            items.add(modFromId.name() + " - " + modFromId.id());
-
-            list.setItems(items);
-        } catch (NumberFormatException err) {
-            searchMod(modName);
-        }
+        });
     }
 
     private void searchMod(String modName) {
@@ -221,7 +233,7 @@ public class CurseforgeContainer extends SearchContainer {
             Response<List<Mod>> searchResponse = Main.cfApi.getHelper().searchMods(modSearchQuery);
 
             if(searchResponse.isEmpty() || searchResponse.get().isEmpty()) {
-                list.setItems(FXCollections.observableArrayList("Aucun résultat"));
+                Platform.runLater(() -> list.setItems(FXCollections.observableArrayList("Aucun résultat")));
             } else {
                 List<Mod> mods = searchResponse.get();
 
@@ -231,7 +243,7 @@ public class CurseforgeContainer extends SearchContainer {
                     items.add(mod.name() + " - " + mod.id());
                 }
 
-                list.setItems(items);
+                Platform.runLater(() -> list.setItems(items));
             }
         } catch (CurseForgeException e) {
             throw new RuntimeException(e);

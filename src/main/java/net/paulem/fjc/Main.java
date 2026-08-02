@@ -3,36 +3,27 @@ package net.paulem.fjc;
 import atlantafx.base.theme.PrimerDark;
 import io.github.matyrobbrt.curseforgeapi.CurseForgeAPI;
 import javafx.scene.image.Image;
-import net.paulem.fjc.gui.components.PropertiesViewerPopup;
+import net.paulem.fjc.gui.content.ModsListPanel;
 import net.paulem.fjc.gui.content.containers.CurseforgeContainer;
-import net.paulem.fjc.flow.mod.Mod;
 import net.paulem.fjc.flow.ModsJson;
 import net.paulem.fjc.gui.content.SearchType;
 import net.paulem.fjc.gui.content.containers.ModrinthContainer;
 import net.paulem.fjc.gui.content.containers.UrlContainer;
-import net.paulem.fjc.utils.CFUtils;
-import net.paulem.fjc.utils.ModrinthUtils;
-import ovh.paulem.modrinthapi.Modrinth;
+import net.paulem.fjc.utils.JsonUtils;
 import javafx.application.Application;
 import javafx.application.Platform;
-import javafx.collections.FXCollections;
-import javafx.collections.ObservableList;
-import javafx.collections.transformation.FilteredList;
-import javafx.collections.transformation.SortedList;
 import javafx.geometry.Insets;
+import javafx.geometry.Orientation;
 import javafx.geometry.Pos;
 import javafx.scene.Scene;
 import javafx.scene.control.*;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
-import javafx.scene.input.MouseButton;
 import javafx.scene.layout.GridPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
-import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
-import javafx.scene.shape.Circle;
 import javafx.scene.text.Font;
 import javafx.scene.text.FontWeight;
 import javafx.scene.text.Text;
@@ -40,7 +31,9 @@ import javafx.stage.Stage;
 import joptsimple.OptionParser;
 import joptsimple.OptionSet;
 import org.jetbrains.annotations.Nullable;
-import ovh.paulem.modrinthapi.types.project.Project;
+import org.kordamp.ikonli.Ikon;
+import org.kordamp.ikonli.javafx.FontIcon;
+import org.kordamp.ikonli.material2.Material2AL;
 
 import javax.security.auth.login.LoginException;
 import java.awt.*;
@@ -49,104 +42,34 @@ import java.io.IOException;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
-import java.util.concurrent.*;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicLong;
-import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.prefs.Preferences;
 
 import static net.paulem.fjc.utils.JsonUtils.*;
 import static net.paulem.fjc.utils.ManipulationUtils.checkOptArg;
-
-import net.paulem.fjc.flow.mod.UrlMod;
-import net.paulem.fjc.flow.mod.CurseForgeMod;
-import net.paulem.fjc.flow.mod.ModrinthMod;
 
 public class Main extends Application {
     public static @Nullable String CF_API_KEY;
 
     public static final String VERSION = "1.4.2";
-    public static final Modrinth MODRINTH = new Modrinth(null, "paulem", "FlowJsonCreator", VERSION);
+    public static final ovh.paulem.modrinthapi.Modrinth MODRINTH = new ovh.paulem.modrinthapi.Modrinth(null, "paulem", "FlowJsonCreator", VERSION);
 
     public static ModsJson jsonContent;
 
-    public static ListView<String> list;
+    /** The searchable/foldable mods list. Also used by {@link JsonUtils} to keep the UI in sync when mods.json changes. */
+    public static ModsListPanel modsListPanel;
+
     @Nullable
     public static CurseForgeAPI cfApi = null;
 
-    // --- Search / filter / display infra for the main mods list ---
-    private static final ObservableList<String> masterItems = FXCollections.observableArrayList();
-    private static FilteredList<String> filteredItems;
-    private static final javafx.beans.property.SimpleStringProperty searchQuery = new javafx.beans.property.SimpleStringProperty("");
-    private static final javafx.beans.property.SimpleStringProperty categoryFilter = new javafx.beans.property.SimpleStringProperty("Tous");
+    private static final Preferences PREFS = Preferences.userNodeForPackage(Main.class);
+    private static final String PREF_WIDTH = "windowWidth";
+    private static final String PREF_HEIGHT = "windowHeight";
+    private static final String PREF_SEARCH_TYPE = "lastSearchType";
 
-    public GridPane mainGrid;
     public GridPane subGrid;
 
     public ComboBox<String> searchType;
     public @Nullable String oldSearchValue;
-
-    // --- Async update infra ---
-    private static ScheduledExecutorService uiScheduler;
-    private static ExecutorService bgExecutor;
-    private static final CopyOnWriteArrayList<String> stagedItems = new CopyOnWriteArrayList<>();
-    private static final AtomicBoolean uiDirty = new AtomicBoolean(false);
-    private static final AtomicLong listGeneration = new AtomicLong(0);
-    private static volatile boolean executorsStarted = false;
-
-    // Mini logger debug
-    private static final boolean DEBUG = Boolean.parseBoolean(System.getProperty("fjc.debug", "true"));
-    private static void debug(String message) {
-        if (DEBUG) System.err.println("[DEBUG] " + message);
-    }
-    private static void debug(String message, Throwable t) {
-        if (DEBUG) {
-            System.err.println("[DEBUG] " + message);
-            t.printStackTrace(System.err);
-        }
-    }
-
-    /** Détermine la catégorie d'un item de la liste à partir de son préfixe. */
-    private static String categoryOf(String item) {
-        if (item.startsWith("CF ")) return "CurseForge";
-        if (item.startsWith("MOD ")) return "Modrinth";
-        return "URL";
-    }
-
-    /** Nom "propre" à afficher (sans le préfixe technique ni les ids). */
-    private static String friendlyName(String item) {
-        String category = categoryOf(item);
-        String withoutPrefix = category.equals("URL") ? item : item.substring(item.indexOf(' ') + 1);
-        int dash = withoutPrefix.indexOf(" - ");
-        return dash >= 0 ? withoutPrefix.substring(0, dash) : withoutPrefix;
-    }
-
-    private static boolean matchesFilter(String item) {
-        String cat = categoryFilter.get();
-        if (cat != null && !cat.equals("Tous") && !categoryOf(item).equals(cat)) return false;
-
-        String query = searchQuery.get();
-        if (query == null || query.isBlank()) return true;
-        return item.toLowerCase().contains(query.toLowerCase());
-    }
-
-    private static synchronized void ensureExecutorsStarted() {
-        if (executorsStarted) return;
-        bgExecutor = Executors.newFixedThreadPool(Math.max(2, Runtime.getRuntime().availableProcessors() / 2));
-        uiScheduler = Executors.newSingleThreadScheduledExecutor(r -> {
-            Thread t = new Thread(r, "fjc-ui-throttler");
-            t.setDaemon(true);
-            return t;
-        });
-        // Cadence: 3 mises à jour max / seconde => toutes ~333ms
-        uiScheduler.scheduleAtFixedRate(() -> {
-            if (!uiDirty.getAndSet(false)) return; // Rien à pousser
-            // Snapshot thread-safe
-            List<String> snapshot = List.copyOf(stagedItems);
-            if (list == null) return;
-            Platform.runLater(() -> masterItems.setAll(snapshot));
-        }, 0, 333, TimeUnit.MILLISECONDS);
-        executorsStarted = true;
-    }
 
     @Override
     public void start(Stage stage) {
@@ -154,356 +77,177 @@ public class Main extends Application {
 
         stage.setTitle("FlowJsonCreator v" + VERSION);
         stage.setFullScreen(false);
-        stage.centerOnScreen();
         stage.getIcons().add(new Image("assets/icons.png"));
 
-        mainGrid = new GridPane();
-        mainGrid.setAlignment(Pos.CENTER);
-        mainGrid.setHgap(10);
-        mainGrid.setVgap(10);
-        mainGrid.setPadding(new Insets(25));
+        VBox root = new VBox(16);
+        root.setPadding(new Insets(20));
 
-        subGrid = new GridPane();
-        subGrid.setPadding(new Insets(0, 10, 0, 10));
-        mainGrid.add(subGrid, 0, 2);
-
+        // -------- HEADER --------
+        FontIcon appIcon = FontIcon.of(Material2AL.EXTENSION, 26, Color.web("#5aa9e6"));
         Text title = new Text("FlowJsonCreator");
-        title.setFont(Font.font("Tahoma", FontWeight.NORMAL, 20));
-        mainGrid.add(title, 0, 0, 2, 1);
+        title.setFont(Font.font("Tahoma", FontWeight.BOLD, 22));
+        Label versionLabel = new Label("v" + VERSION);
+        versionLabel.getStyleClass().add("text-muted");
+        HBox header = new HBox(10, appIcon, title, versionLabel);
+        header.setAlignment(Pos.CENTER_LEFT);
+        root.getChildren().add(header);
+        // -------- END HEADER --------
 
-        // -------- SEARCH --------
+        HBox mainRow = new HBox(20);
+
+        // -------- LEFT: add a mod --------
+        VBox addModBox = new VBox(10);
+        addModBox.setPrefWidth(320);
+        addModBox.setMinWidth(280);
+
+        Label addModTitle = sectionTitle("Ajouter un mod", Material2AL.ADD_CIRCLE);
+        addModBox.getChildren().add(addModTitle);
+
         HBox searchBox = new HBox(10);
-        mainGrid.add(searchBox, 0, 1, 2, 1);
-
-        Label searchLabel = new Label("Rechercher avec :");
-        searchLabel.setTranslateY(5);
+        searchBox.setAlignment(Pos.CENTER_LEFT);
+        Label searchLabel = new Label("Source :");
         searchBox.getChildren().add(searchLabel);
 
-        // Search type chooser
         searchType = new ComboBox<>();
-
         List<String> searchTypeWords = Arrays.stream(SearchType.values()).map(SearchType::toWord).toList();
         searchType.getItems().addAll(searchTypeWords);
+        searchType.setCellFactory(lv -> searchTypeCell());
+        searchType.setButtonCell(searchTypeCell());
         searchBox.getChildren().add(searchType);
-        // -------- END SEARCH --------
+        addModBox.getChildren().add(searchBox);
 
-        // -------- Mods.json viewer --------
+        subGrid = new GridPane();
+        subGrid.setHgap(10);
+        subGrid.setVgap(10);
+        subGrid.setPadding(new Insets(10, 0, 0, 0));
+        addModBox.getChildren().add(subGrid);
+        // -------- END LEFT --------
+
+        Separator separator = new Separator(Orientation.VERTICAL);
+
+        // -------- RIGHT: mods.json viewer --------
         VBox modsJsonBox = new VBox(10);
-        mainGrid.add(modsJsonBox, 2, 0, 2, 3);
+        HBox.setHgrow(modsJsonBox, Priority.ALWAYS);
 
         HBox modsViewerBox = new HBox(10);
-        modsJsonBox.getChildren().add(modsViewerBox);
-
-        Label modsJsonLabel = new Label("Mods.json");
-        modsJsonLabel.setTranslateY(5);
+        modsViewerBox.setAlignment(Pos.CENTER_LEFT);
+        Label modsJsonLabel = sectionTitle("Mods du modpack", Material2AL.LIST);
+        HBox.setHgrow(modsJsonLabel, Priority.ALWAYS);
         modsViewerBox.getChildren().add(modsJsonLabel);
 
-        Button btn = new Button("Ouvrir");
+        Button btn = iconButton("Ouvrir le dossier", Material2AL.FOLDER_OPEN);
         modsViewerBox.getChildren().add(btn);
         btn.setOnAction(actionEvent -> {
             try {
                 Desktop.getDesktop().open(modsJson.getParentFile());
             } catch (IOException e) {
-                throw new RuntimeException(e);
+                showError("Impossible d'ouvrir le dossier", e.getMessage());
             }
         });
 
-        Button importBtn = new Button("Importer Manifest");
+        Button importBtn = iconButton("Importer un manifest", Material2AL.CLOUD_UPLOAD);
         modsViewerBox.getChildren().add(importBtn);
-        importBtn.setOnAction(actionEvent -> {
-            FileDialog fileChooser = new FileDialog((Frame)null);
-            fileChooser.setTitle("Sélectionner un manifest.json");
-            fileChooser.setFilenameFilter((dir, name) -> name.equals("manifest.json"));
-            fileChooser.setVisible(true);
-            File selectedFile = new File(fileChooser.getDirectory(), fileChooser.getFile());
-            try {
-                addCurseForgeManifest(selectedFile);
-            } catch (IOException e) {
-                Alert alert = new Alert(Alert.AlertType.ERROR);
-                alert.setTitle("Erreur");
-                alert.setHeaderText("Erreur lors de l'importation du manifest");
-                alert.setContentText(e.getMessage());
-                alert.showAndWait();
-            }
+        importBtn.setOnAction(actionEvent -> onImportManifest(stage));
+
+        modsJsonBox.getChildren().add(modsViewerBox);
+
+        modsListPanel = new ModsListPanel(stage);
+        VBox.setVgrow(modsListPanel, Priority.ALWAYS);
+        modsJsonBox.getChildren().add(modsListPanel);
+        modsListPanel.loadInitial(jsonContent);
+        // -------- END RIGHT --------
+
+        mainRow.getChildren().addAll(addModBox, separator, modsJsonBox);
+        HBox.setHgrow(mainRow, Priority.ALWAYS);
+        VBox.setVgrow(mainRow, Priority.ALWAYS);
+        root.getChildren().add(mainRow);
+
+        double width = PREFS.getDouble(PREF_WIDTH, 980);
+        double height = PREFS.getDouble(PREF_HEIGHT, 620);
+        Scene scene = new Scene(root, width, height);
+        stage.setScene(scene);
+        stage.centerOnScreen();
+        stage.show();
+
+        stage.widthProperty().addListener((obs, oldV, newV) -> PREFS.putDouble(PREF_WIDTH, newV.doubleValue()));
+        stage.heightProperty().addListener((obs, oldV, newV) -> PREFS.putDouble(PREF_HEIGHT, newV.doubleValue()));
+
+        // -------- EVENTS --------
+        searchType.setOnAction(event -> {
+            String value = searchType.getValue();
+            if (value == null || value.equals(oldSearchValue)) return;
+            selectSearchType(stage, value);
         });
 
-        // ------- Barre de recherche / filtre par catégorie -------
-        HBox filterBox = new HBox(10);
-        modsJsonBox.getChildren().add(filterBox);
+        String lastType = PREFS.get(PREF_SEARCH_TYPE, SearchType.MODRINTH.toWord());
+        if (!searchTypeWords.contains(lastType)) lastType = SearchType.MODRINTH.toWord();
+        searchType.setValue(lastType);
+        selectSearchType(stage, lastType);
+        // -------- END EVENTS --------
+    }
 
-        TextField modsSearchField = new TextField();
-        modsSearchField.setPromptText("Rechercher un mod...");
-        HBox.setHgrow(modsSearchField, Priority.ALWAYS);
-        modsSearchField.textProperty().addListener((obs, oldV, newV) -> {
-            searchQuery.set(newV);
-            if (filteredItems != null) filteredItems.setPredicate(Main::matchesFilter);
-        });
-        filterBox.getChildren().add(modsSearchField);
+    private void selectSearchType(Stage stage, String value) {
+        oldSearchValue = value;
+        PREFS.put(PREF_SEARCH_TYPE, value);
 
-        ComboBox<String> categoryComboBox = new ComboBox<>();
-        categoryComboBox.getItems().addAll("Tous", "Modrinth", "CurseForge", "URL");
-        categoryComboBox.setValue("Tous");
-        categoryComboBox.setOnAction(e -> {
-            categoryFilter.set(categoryComboBox.getValue());
-            if (filteredItems != null) filteredItems.setPredicate(Main::matchesFilter);
-        });
-        filterBox.getChildren().add(categoryComboBox);
-        // ------- FIN barre de recherche -------
+        switch (SearchType.fromString(value)) {
+            case URL -> new UrlContainer(stage, subGrid);
+            case MODRINTH -> new ModrinthContainer(stage, subGrid);
+            case CURSEFORGE -> new CurseforgeContainer(stage, subGrid);
+        }
+    }
 
-        Label countLabel = new Label();
-        modsJsonBox.getChildren().add(countLabel);
+    private static Label sectionTitle(String text, Ikon icon) {
+        Label label = new Label(text, FontIcon.of(icon, 16));
+        label.setStyle("-fx-font-weight: bold; -fx-font-size: 1.05em;");
+        return label;
+    }
 
-        list = new ListView<>();
-        modsJsonBox.getChildren().add(list);
+    private static Button iconButton(String text, Ikon icon) {
+        Button button = new Button(text, FontIcon.of(icon, 14));
+        return button;
+    }
 
-        filteredItems = new FilteredList<>(masterItems, Main::matchesFilter);
-        SortedList<String> sortedItems = new SortedList<>(filteredItems, String.CASE_INSENSITIVE_ORDER);
-        list.setItems(sortedItems);
-
-        countLabel.textProperty().bind(javafx.beans.binding.Bindings.size(sortedItems).asString("%d mod(s)"));
-
-        // Cellules personnalisées : pastille de couleur par catégorie + nom lisible
-        list.setCellFactory(lv -> new ListCell<>() {
-            private final Circle badge = new Circle(5);
-            private final Label label = new Label();
-            private final HBox graphic = new HBox(8, badge, label);
-
-            {
-                graphic.setAlignment(Pos.CENTER_LEFT);
-            }
-
+    private static ListCell<String> searchTypeCell() {
+        return new ListCell<>() {
             @Override
             protected void updateItem(String item, boolean empty) {
                 super.updateItem(item, empty);
                 if (empty || item == null) {
+                    setText(null);
                     setGraphic(null);
-                    setTooltip(null);
                     return;
                 }
-
-                String category = categoryOf(item);
-                Color color = switch (category) {
-                    case "Modrinth" -> Color.web("#1bd96a");
-                    case "CurseForge" -> Color.web("#f16436");
-                    default -> Color.web("#5aa9e6"); // URL
-                };
-                badge.setFill(color);
-
-                boolean loading = item.contains("(chargement...)");
-                boolean notFound = item.contains("(introuvable)");
-                String display = "[" + category + "] " + friendlyName(item);
-                if (loading) display += " ⏳";
-                if (notFound) display += " ⚠";
-
-                label.setText(display);
-                setGraphic(graphic);
-                setTooltip(new Tooltip(item));
+                setText(item);
+                SearchType type = SearchType.fromString(item);
+                setGraphic(FontIcon.of(type.toCategory().getIcon(), 14, type.toCategory().getColor()));
             }
-        });
-
-        // Démarre les exécutors avant la première mise à jour
-        ensureExecutorsStarted();
-        updateList();
-        // -------- END Mods.json viewer --------
-
-        Scene scene = new Scene(mainGrid, 750, 480);
-        stage.setScene(scene);
-
-        stage.show();
-
-        // -------- EVENTS --------
-        searchType.setOnAction(event -> {
-            if(searchType.getValue().equals(oldSearchValue)) return;
-
-            switch (SearchType.fromString(searchType.getValue())) {
-                case URL -> new UrlContainer(stage, subGrid);
-                case MODRINTH -> new ModrinthContainer(stage, subGrid);
-                case CURSEFORGE -> new CurseforgeContainer(stage, subGrid);
-            }
-        });
-
-        list.setOnMouseClicked(mouseEvent -> {
-            @Nullable String selectedItem = list.getSelectionModel().getSelectedItem();
-            if(selectedItem == null) return;
-
-            // Double click to remove item
-            if(mouseEvent.getButton().equals(MouseButton.PRIMARY)
-                    && mouseEvent.getClickCount() == 2){
-
-                list.getItems().remove(selectedItem);
-                removeMod(selectedItem);
-            } else if(mouseEvent.getButton().equals(MouseButton.SECONDARY)) {
-
-                Mod mod = getModFromString(selectedItem);
-                if(mod == null) return;
-                new PropertiesViewerPopup(stage)
-                        .showPopup(mod);
-            }
-        });
-        // -------- END EVENTS --------
+        };
     }
 
-    /**
-     * Update the list view with the current mods.
-     */
-    public static void updateList() {
-        ensureExecutorsStarted();
+    private void onImportManifest(Stage stage) {
+        FileDialog fileChooser = new FileDialog((Frame) null);
+        fileChooser.setTitle("Sélectionner un manifest.json");
+        fileChooser.setFilenameFilter((dir, name) -> name.equals("manifest.json"));
+        fileChooser.setVisible(true);
+        String directory = fileChooser.getDirectory();
+        String file = fileChooser.getFile();
+        if (directory == null || file == null) return; // annulé par l'utilisateur
 
-        // Incrémente la génération pour invalider les anciennes tâches
-        final long generation = listGeneration.incrementAndGet();
-
-        // Réinitialise le buffer et ajoute les éléments non-bloquants
-        stagedItems.clear();
-
-        jsonContent.mods.forEach(mod -> stagedItems.add(mod.name()));
-        uiDirty.set(true); // première mise à jour rapide avec les noms simples
-
-        // CurseForge: placeholders + résolution en arrière-plan
-        jsonContent.curseFiles.forEach(cf -> {
-            final String placeholder = "CF " + cf.projectID() + " - " + cf.fileID() + " (chargement...)";
-            stagedItems.add(placeholder);
-            uiDirty.set(true);
-
-            bgExecutor.submit(() -> {
-                try {
-                    io.github.matyrobbrt.curseforgeapi.schemas.mod.Mod modFromId = CFUtils.getModFromId(cf.projectID());
-                    if (generation != listGeneration.get()) return; // tâche obsolète
-                    if (modFromId == null) {
-                        debug("CF introuvable pour projectID=" + cf.projectID() + ", fileID=" + cf.fileID());
-                        int idx = stagedItems.indexOf(placeholder);
-                        String failed = "CF " + cf.projectID() + " - " + cf.fileID() + " (introuvable)";
-                        if (idx >= 0) stagedItems.set(idx, failed); else stagedItems.add(failed);
-                        uiDirty.set(true);
-                        return;
-                    }
-                    final String resolved = "CF " + modFromId.name() + " - " + cf.projectID() + " - " + cf.fileID();
-                    int idx = stagedItems.indexOf(placeholder);
-                    if (idx >= 0) stagedItems.set(idx, resolved); else stagedItems.add(resolved);
-                    uiDirty.set(true);
-                } catch (Exception ex) {
-                    if (generation != listGeneration.get()) return; // tâche obsolète
-                    debug("Erreur réseau CF pour projectID=" + cf.projectID() + ", fileID=" + cf.fileID(), ex);
-                    int idx = stagedItems.indexOf(placeholder);
-                    String failed = "CF " + cf.projectID() + " - " + cf.fileID() + " (introuvable)";
-                    if (idx >= 0) stagedItems.set(idx, failed); else stagedItems.add(failed);
-                    uiDirty.set(true);
-                }
-            });
-        });
-
-        // Modrinth: placeholders + résolution en arrière-plan
-        jsonContent.modrinthMods.forEach(mr -> {
-            final String placeholder = "MOD " + mr.getProjectReference() + " - " + mr.getVersionNumber() + " (chargement...)";
-            stagedItems.add(placeholder);
-            uiDirty.set(true);
-
-            bgExecutor.submit(() -> {
-                try {
-                    Project modFromSlug = ModrinthUtils.getModFromSlug(mr.getProjectReference());
-                    if (generation != listGeneration.get()) return; // tâche obsolète
-                    if (modFromSlug == null) {
-                        debug("Modrinth introuvable pour slug=" + mr.getProjectReference() + ", version=" + mr.getVersionNumber());
-                        int idx = stagedItems.indexOf(placeholder);
-                        String failed = "MOD " + mr.getProjectReference() + " - " + mr.getVersionNumber() + " (introuvable)";
-                        if (idx >= 0) stagedItems.set(idx, failed); else stagedItems.add(failed);
-                        uiDirty.set(true);
-                        return;
-                    }
-                    final String resolved = "MOD " + modFromSlug.title() + " - " + mr.getProjectReference() + " - " + mr.getVersionNumber();
-                    int idx = stagedItems.indexOf(placeholder);
-                    if (idx >= 0) stagedItems.set(idx, resolved); else stagedItems.add(resolved);
-                    uiDirty.set(true);
-                } catch (Exception ex) {
-                    if (generation != listGeneration.get()) return; // tâche obsolète
-                    debug("Erreur réseau Modrinth pour slug=" + mr.getProjectReference() + ", version=" + mr.getVersionNumber(), ex);
-                    int idx = stagedItems.indexOf(placeholder);
-                    String failed = "MOD " + mr.getProjectReference() + " - " + mr.getVersionNumber() + " (introuvable)";
-                    if (idx >= 0) stagedItems.set(idx, failed); else stagedItems.add(failed);
-                    uiDirty.set(true);
-                }
-            });
-        });
-    }
-
-    /** Ajoute un seul élément à la liste (mise à jour incrémentale). */
-    public static void addListItem(Mod mod) {
-        ensureExecutorsStarted();
-        if (mod instanceof UrlMod url) {
-            stagedItems.add(url.name());
-            uiDirty.set(true);
-            return;
-        }
-        if (mod instanceof CurseForgeMod cf) {
-            final String placeholder = "CF " + cf.projectID() + " - " + cf.fileID() + " (chargement...)";
-            stagedItems.add(placeholder);
-            uiDirty.set(true);
-            bgExecutor.submit(() -> {
-                try {
-                    io.github.matyrobbrt.curseforgeapi.schemas.mod.Mod modFromId = CFUtils.getModFromId(cf.projectID());
-                    if (modFromId == null) {
-                        int idx = stagedItems.indexOf(placeholder);
-                        String failed = "CF " + cf.projectID() + " - " + cf.fileID() + " (introuvable)";
-                        if (idx >= 0) stagedItems.set(idx, failed); else stagedItems.add(failed);
-                        uiDirty.set(true);
-                        return;
-                    }
-                    final String resolved = "CF " + modFromId.name() + " - " + cf.projectID() + " - " + cf.fileID();
-                    int idx = stagedItems.indexOf(placeholder);
-                    if (idx >= 0) stagedItems.set(idx, resolved); else stagedItems.add(resolved);
-                    uiDirty.set(true);
-                } catch (Exception ex) {
-                    int idx = stagedItems.indexOf(placeholder);
-                    String failed = "CF " + cf.projectID() + " - " + cf.fileID() + " (introuvable)";
-                    if (idx >= 0) stagedItems.set(idx, failed); else stagedItems.add(failed);
-                    uiDirty.set(true);
-                }
-            });
-            return;
-        }
-        if (mod instanceof ModrinthMod mr) {
-            final String placeholder = "MOD " + mr.getProjectReference() + " - " + mr.getVersionNumber() + " (chargement...)";
-            stagedItems.add(placeholder);
-            uiDirty.set(true);
-            bgExecutor.submit(() -> {
-                try {
-                    Project modFromSlug = ModrinthUtils.getModFromSlug(mr.getProjectReference());
-                    if (modFromSlug == null) {
-                        int idx = stagedItems.indexOf(placeholder);
-                        String failed = "MOD " + mr.getProjectReference() + " - " + mr.getVersionNumber() + " (introuvable)";
-                        if (idx >= 0) stagedItems.set(idx, failed); else stagedItems.add(failed);
-                        uiDirty.set(true);
-                        return;
-                    }
-                    final String resolved = "MOD " + modFromSlug.title() + " - " + mr.getProjectReference() + " - " + mr.getVersionNumber();
-                    int idx = stagedItems.indexOf(placeholder);
-                    if (idx >= 0) stagedItems.set(idx, resolved); else stagedItems.add(resolved);
-                    uiDirty.set(true);
-                } catch (Exception ex) {
-                    int idx = stagedItems.indexOf(placeholder);
-                    String failed = "MOD " + mr.getProjectReference() + " - " + mr.getVersionNumber() + " (introuvable)";
-                    if (idx >= 0) stagedItems.set(idx, failed); else stagedItems.add(failed);
-                    uiDirty.set(true);
-                }
-            });
+        File selectedFile = new File(directory, file);
+        try {
+            addCurseForgeManifest(selectedFile);
+        } catch (IOException e) {
+            showError("Erreur lors de l'importation du manifest", e.getMessage());
         }
     }
 
-    /** Retire un seul élément de la liste (mise à jour incrémentale). */
-    public static void removeListItem(Mod mod, @Nullable String originalItem) {
-        ensureExecutorsStarted();
-        if (originalItem != null) {
-            stagedItems.remove(originalItem);
-        }
-        if (mod instanceof UrlMod url) {
-            stagedItems.remove(url.name());
-        } else if (mod instanceof CurseForgeMod cf) {
-            String marker = " " + cf.projectID() + " - " + cf.fileID();
-            stagedItems.removeIf(s -> s.startsWith("CF ") && s.contains(marker));
-        } else if (mod instanceof ModrinthMod mr) {
-            String marker = " " + mr.getProjectReference() + " - " + mr.getVersionNumber();
-            stagedItems.removeIf(s -> s.startsWith("MOD ") && s.contains(marker));
-        }
-        uiDirty.set(true);
+    private static void showError(String header, @Nullable String message) {
+        Alert alert = new Alert(Alert.AlertType.ERROR);
+        alert.setTitle("Erreur");
+        alert.setHeaderText(header);
+        alert.setContentText(message != null ? message : "Erreur inconnue.");
+        alert.showAndWait();
     }
 
     /**
@@ -511,16 +255,11 @@ public class Main extends Application {
      * an alert instead of letting the whole application crash.
      */
     private static void handleUncaught(Thread thread, Throwable throwable) {
-        debug("Erreur non interceptée sur le thread " + thread.getName(), throwable);
+        System.err.println("Erreur non interceptée sur le thread " + thread.getName());
+        throwable.printStackTrace(System.err);
 
-        Runnable showAlert = () -> {
-            Alert alert = new Alert(Alert.AlertType.ERROR);
-            alert.setTitle("Erreur inattendue");
-            alert.setHeaderText("Une erreur est survenue, mais l'application continue de fonctionner");
-            String message = throwable.getMessage();
-            alert.setContentText(message != null ? message : throwable.getClass().getSimpleName());
-            alert.showAndWait();
-        };
+        Runnable showAlert = () -> showError("Une erreur est survenue, mais l'application continue de fonctionner",
+                throwable.getMessage() != null ? throwable.getMessage() : throwable.getClass().getSimpleName());
 
         if (Platform.isFxApplicationThread()) {
             showAlert.run();
@@ -555,13 +294,7 @@ public class Main extends Application {
     public void stop() throws Exception {
         saveFile(jsonContent);
 
-        // Arrêt propre des exécutors
-        if (uiScheduler != null) {
-            uiScheduler.shutdownNow();
-        }
-        if (bgExecutor != null) {
-            bgExecutor.shutdownNow();
-        }
+        if (modsListPanel != null) modsListPanel.shutdown();
 
         super.stop();
     }
