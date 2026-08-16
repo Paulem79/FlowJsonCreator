@@ -7,7 +7,7 @@ plugins {
     id("com.gradleup.shadow") version "9.1.0"
     id("java")
     id("application")
-    id("org.panteleyev.jpackageplugin") version "1.7.6"
+    id("org.panteleyev.jpackageplugin") version "2.1.0"
 }
 
 group = "net.paulem.fjc"
