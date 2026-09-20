@@ -153,7 +153,7 @@ public class ModrinthContainer extends SearchContainer {
 
         runInBackground(() -> {
             try {
-                ListVersions listVersions = Main.MODRINTH.listVersions(modId);
+                ListVersions listVersions = ModrinthUtils.listVersions(modId);
 
                 List<Version> versions = listVersions.versions()
                         .stream()
