@@ -1,6 +1,7 @@
 package net.paulem.fjc.gui.model;
 
 import net.paulem.fjc.flow.mod.Mod;
+import net.paulem.fjc.gui.browse.SearchResult;
 import org.jetbrains.annotations.Nullable;
 
 /**
@@ -22,13 +23,22 @@ public final class ModEntry {
     @Nullable
     private final String subtitle;
     private final Status status;
+    @Nullable
+    private final SearchResult info;
 
     public ModEntry(Mod source, ModCategory category, String title, @Nullable String subtitle, Status status) {
+        this(source, category, title, subtitle, status, null);
+    }
+
+    /** {@code info} is what the source API knows about the project (icon, description, tags, stats), once resolved. */
+    public ModEntry(Mod source, ModCategory category, String title, @Nullable String subtitle, Status status,
+                    @Nullable SearchResult info) {
         this.source = source;
         this.category = category;
         this.title = title;
         this.subtitle = subtitle;
         this.status = status;
+        this.info = info;
     }
 
     public static ModEntry loading(Mod source, ModCategory category, String subtitle) {
@@ -62,6 +72,11 @@ public final class ModEntry {
 
     public Status getStatus() {
         return status;
+    }
+
+    @Nullable
+    public SearchResult getInfo() {
+        return info;
     }
 
     @Override

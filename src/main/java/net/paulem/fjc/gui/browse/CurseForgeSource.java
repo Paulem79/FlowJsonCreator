@@ -135,7 +135,7 @@ public class CurseForgeSource implements ModSource {
         return refs;
     }
 
-    private static SearchResult toResult(Mod mod) {
+    public static SearchResult toResult(Mod mod) {
         List<String> tags = new ArrayList<>();
         if (mod.categories() != null) mod.categories().forEach(c -> tags.add(c.name()));
 

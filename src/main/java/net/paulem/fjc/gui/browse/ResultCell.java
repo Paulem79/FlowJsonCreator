@@ -97,7 +97,7 @@ public class ResultCell extends ListCell<SearchResult> {
             author.getStyleClass().add("text-muted");
             titleRow.getChildren().add(author);
         }
-        titleRow.getChildren().add(sourcePill(r, accent));
+        titleRow.getChildren().add(CardParts.sourcePill(r.source()));
         titleRow.getChildren().add(FontIcon.of(host.isExpanded(r) ? Material2AL.EXPAND_LESS : Material2AL.EXPAND_MORE, 16));
 
         Label description = new Label(r.description());
@@ -106,53 +106,21 @@ public class ResultCell extends ListCell<SearchResult> {
 
         HBox tags = new HBox(6);
         List<String> all = r.tags();
-        for (int i = 0; i < Math.min(MAX_TAGS, all.size()); i++) tags.getChildren().add(tag(all.get(i)));
-        if (all.size() > MAX_TAGS) tags.getChildren().add(tag("+" + (all.size() - MAX_TAGS)));
+        for (int i = 0; i < Math.min(MAX_TAGS, all.size()); i++) tags.getChildren().add(CardParts.tag(all.get(i)));
+        if (all.size() > MAX_TAGS) tags.getChildren().add(CardParts.tag("+" + (all.size() - MAX_TAGS)));
 
         VBox info = new VBox(4, titleRow, description, tags);
         info.setMinWidth(0);
         HBox.setHgrow(info, Priority.ALWAYS);
 
-        HBox card = new HBox(12, iconBox(r), info, buildRight(r, accent));
+        HBox card = new HBox(12, CardParts.iconBox(r.iconUrl(), Material2AL.EXTENSION), info, buildRight(r, accent));
         card.getStyleClass().add("mod-card");
-        card.setStyle("-fx-border-color: " + hex(accent) + "; -fx-border-width: 0 0 0 3; -fx-border-radius: 8 0 0 8;");
+        card.setStyle("-fx-border-color: " + CardParts.hex(accent) + "; -fx-border-width: 0 0 0 3; -fx-border-radius: 8 0 0 8;");
         card.setOnMouseClicked(e -> {
             if (e.getButton() == MouseButton.PRIMARY) host.toggleExpanded(r);
             else if (e.getButton() == MouseButton.SECONDARY) host.showDetails(r);
         });
         return card;
-    }
-
-    private Node iconBox(SearchResult r) {
-        FontIcon placeholder = FontIcon.of(Material2AL.EXTENSION, 28);
-        placeholder.getStyleClass().add("text-muted");
-
-        ImageView view = new ImageView();
-        view.setFitWidth(ICON_SIZE);
-        view.setFitHeight(ICON_SIZE);
-        view.setPreserveRatio(true);
-        view.setSmooth(true);
-        Rectangle clip = new Rectangle(ICON_SIZE, ICON_SIZE);
-        clip.setArcWidth(16);
-        clip.setArcHeight(16);
-        view.setClip(clip);
-
-        StackPane box = new StackPane(placeholder, view);
-        box.setMinSize(ICON_SIZE, ICON_SIZE);
-        box.setPrefSize(ICON_SIZE, ICON_SIZE);
-        box.setMaxSize(ICON_SIZE, ICON_SIZE);
-        box.getStyleClass().add("mod-icon");
-        box.setAlignment(Pos.CENTER);
-
-        if (r.iconUrl() != null) {
-            IconCache.get(r.iconUrl()).thenAccept(icon -> icon.ifPresent(img -> Platform.runLater(() -> {
-                view.setImage(img);
-                placeholder.setVisible(false);
-            })));
-        }
-        HBox wrapper = new HBox(box);
-        wrapper.setAlignment(Pos.TOP_LEFT);
-        return wrapper;
     }
 
     private Node buildRight(SearchResult r, Color accent) {
@@ -163,13 +131,13 @@ public class ResultCell extends ListCell<SearchResult> {
 
         right.getChildren().add(buildAction(r));
 
-        HBox stats = new HBox(12, stat(Material2AL.CLOUD_DOWNLOAD, ManipulationUtils.formatCount(r.downloads())));
-        if (r.follows() > 0) stats.getChildren().add(stat(Material2AL.FAVORITE_BORDER, ManipulationUtils.formatCount(r.follows())));
+        HBox stats = new HBox(12, CardParts.stat(Material2AL.CLOUD_DOWNLOAD, ManipulationUtils.formatCount(r.downloads())));
+        if (r.follows() > 0) stats.getChildren().add(CardParts.stat(Material2AL.FAVORITE_BORDER, ManipulationUtils.formatCount(r.follows())));
         stats.setAlignment(Pos.CENTER_RIGHT);
         right.getChildren().add(stats);
 
         if (r.dateModified() != null) {
-            HBox date = stat(Material2AL.HISTORY, ManipulationUtils.relativeDate(r.dateModified()));
+            HBox date = CardParts.stat(Material2AL.HISTORY, ManipulationUtils.relativeDate(r.dateModified()));
             date.setAlignment(Pos.CENTER_RIGHT);
             right.getChildren().add(date);
         }
@@ -226,11 +194,11 @@ public class ResultCell extends ListCell<SearchResult> {
 
         List<VersionOption> versions = host.versionsFor(r);
         if (versions == null) {
-            box.getChildren().add(muted("Chargement des versions..."));
+            box.getChildren().add(CardParts.muted("Chargement des versions..."));
             return box;
         }
         if (versions.isEmpty()) {
-            box.getChildren().add(muted("Aucune version ne correspond aux filtres."));
+            box.getChildren().add(CardParts.muted("Aucune version ne correspond aux filtres."));
             return box;
         }
 
@@ -239,7 +207,7 @@ public class ResultCell extends ListCell<SearchResult> {
             box.getChildren().add(versionRow(r, versions.get(i), installed));
         }
         if (versions.size() > MAX_VERSION_ROWS) {
-            box.getChildren().add(muted("... et " + (versions.size() - MAX_VERSION_ROWS) + " autres (affine avec les filtres)"));
+            box.getChildren().add(CardParts.muted("... et " + (versions.size() - MAX_VERSION_ROWS) + " autres (affine avec les filtres)"));
         }
         return box;
     }
@@ -268,8 +236,8 @@ public class ResultCell extends ListCell<SearchResult> {
         HBox row = new HBox(10, type, text);
         row.setAlignment(Pos.CENTER_LEFT);
 
-        if (v.downloads() > 0) row.getChildren().add(stat(Material2AL.CLOUD_DOWNLOAD, ManipulationUtils.formatCount(v.downloads())));
-        if (v.date() != null) row.getChildren().add(stat(Material2AL.HISTORY, ManipulationUtils.relativeDate(v.date())));
+        if (v.downloads() > 0) row.getChildren().add(CardParts.stat(Material2AL.CLOUD_DOWNLOAD, ManipulationUtils.formatCount(v.downloads())));
+        if (v.date() != null) row.getChildren().add(CardParts.stat(Material2AL.HISTORY, ManipulationUtils.relativeDate(v.date())));
 
         boolean isInstalled = installed != null && installed.equals(v.mod());
         Button button;
@@ -301,42 +269,4 @@ public class ResultCell extends ListCell<SearchResult> {
     // ------------------------------------------------------------------
     // Small building blocks
     // ------------------------------------------------------------------
-
-    private static Label sourcePill(SearchResult r, Color accent) {
-        Label pill = new Label(r.source().getLabel());
-        pill.setStyle(String.format("-fx-background-color: rgba(%d,%d,%d,0.18); -fx-text-fill: %s; "
-                        + "-fx-background-radius: 10; -fx-padding: 1 8; -fx-font-size: 0.8em; -fx-font-weight: bold;",
-                (int) Math.round(accent.getRed() * 255), (int) Math.round(accent.getGreen() * 255),
-                (int) Math.round(accent.getBlue() * 255), hex(accent)));
-        pill.setMinWidth(Region.USE_PREF_SIZE);
-        return pill;
-    }
-
-    private static Label tag(String text) {
-        Label label = new Label(text);
-        label.getStyleClass().add("mod-tag");
-        label.setMinWidth(Region.USE_PREF_SIZE);
-        return label;
-    }
-
-    private static HBox stat(Ikon icon, String text) {
-        FontIcon fontIcon = FontIcon.of(icon, 14);
-        fontIcon.getStyleClass().add("text-muted");
-        Label label = new Label(text);
-        label.setTextAlignment(TextAlignment.RIGHT);
-        HBox box = new HBox(4, fontIcon, label);
-        box.setAlignment(Pos.CENTER_LEFT);
-        return box;
-    }
-
-    private static Label muted(String text) {
-        Label label = new Label(text);
-        label.getStyleClass().add("text-muted");
-        return label;
-    }
-
-    private static String hex(Color c) {
-        return String.format("#%02x%02x%02x", (int) Math.round(c.getRed() * 255),
-                (int) Math.round(c.getGreen() * 255), (int) Math.round(c.getBlue() * 255));
-    }
 }

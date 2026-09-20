@@ -49,3 +49,8 @@
 .installed-badge .ikonli-font-icon {
     -fx-icon-color: -color-success-fg;
 }
+
+/* The selected card (used by the Delete key in the modpack list). */
+.browse-list .list-cell:filled:selected .mod-card {
+    -fx-background-color: -color-accent-subtle;
+}

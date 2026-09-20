@@ -10,6 +10,7 @@ import net.paulem.fjc.utils.ModrinthUtils;
 import org.jetbrains.annotations.Nullable;
 import ovh.paulem.modrinthapi.Modrinth;
 import ovh.paulem.modrinthapi.types.project.Project;
+import ovh.paulem.modrinthapi.types.project.ProjectSide;
 import ovh.paulem.modrinthapi.types.version.ListVersions;
 import ovh.paulem.modrinthapi.types.version.Version;
 
@@ -77,9 +78,33 @@ public class ModrinthSource implements ModSource {
     @Override
     public Optional<SearchResult> project(String id) {
         Project p = ModrinthUtils.getModFromSlug(id);
-        if (p == null) return Optional.empty();
-        return Optional.of(new SearchResult(ModCategory.MODRINTH, p.id(), p.slug(), p.title(), p.description(), "",
-                p.iconUrl(), 0, 0, List.of(), null, null, null));
+        return p == null ? Optional.empty() : Optional.of(fromProject(p));
+    }
+
+    /** A full project (as opposed to a search hit) turned into the same shape, e.g. for the modpack cards. */
+    public static SearchResult fromProject(Project p) {
+        List<String> tags = new ArrayList<>();
+        boolean clientOk = p.clientSide() != ProjectSide.UNSUPPORTED, serverOk = p.serverSide() != ProjectSide.UNSUPPORTED;
+        if (clientOk && serverOk) tags.add("Client ou serveur");
+        else if (clientOk) tags.add("Client");
+        else if (serverOk) tags.add("Serveur");
+
+        List<String> loaders = new ArrayList<>();
+        for (String slug : p.categories()) {
+            if (Labels.isLoader(slug)) loaders.add(Labels.loader(slug));
+            else tags.add(Labels.category(slug));
+        }
+        // A full project lists its loaders in a field of their own rather than among the categories.
+        if (p.loaders() != null) {
+            for (String slug : p.loaders()) {
+                String label = Labels.loader(slug);
+                if (Labels.isLoader(slug) && !loaders.contains(label)) loaders.add(label);
+            }
+        }
+        tags.addAll(loaders);
+
+        return new SearchResult(ModCategory.MODRINTH, p.id(), p.slug(), p.title(), p.description(), "",
+                p.iconUrl(), p.downloads(), p.followers(), tags, parseInstant(p.updated()), parseInstant(p.published()), p);
     }
 
     @Override
