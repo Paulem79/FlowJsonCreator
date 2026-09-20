@@ -6,6 +6,8 @@ import net.paulem.fjc.flow.mod.Mod;
 import net.paulem.fjc.flow.mod.ModrinthMod;
 import net.paulem.fjc.flow.mod.UrlMod;
 
+import org.jetbrains.annotations.Nullable;
+
 import java.lang.reflect.Type;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -59,6 +61,25 @@ public class ModsJson {
         } else if (mod instanceof ModrinthMod modrinthMod) {
             this.modrinthMods.remove(modrinthMod);
         }
+    }
+
+    /** The Modrinth entry for a project, whatever its version. The reference may be a project id or a slug. */
+    @Nullable
+    public ModrinthMod findModrinth(String id, String slug) {
+        for (ModrinthMod mod : this.modrinthMods) {
+            String ref = mod.getProjectReference();
+            if (ref.equalsIgnoreCase(id) || ref.equalsIgnoreCase(slug)) return mod;
+        }
+        return null;
+    }
+
+    /** The CurseForge entry for a project, whatever its file. */
+    @Nullable
+    public CurseForgeMod findCurseForge(int projectId) {
+        for (CurseForgeMod mod : this.curseFiles) {
+            if (mod.projectID() == projectId) return mod;
+        }
+        return null;
     }
 
     /** Total number of mods across all categories. */

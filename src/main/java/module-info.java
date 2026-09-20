@@ -1,6 +1,7 @@
 module FlowJsonCreator {
     requires java.xml.bind;
     requires javafx.controls;
+    requires javafx.swing;
     requires joptsimple;
     requires nativejavafx.taskbar;
     requires modrinthapi;

@@ -41,8 +41,33 @@ public class ModrinthUtils {
      * librairie (ex: "sources-jar"), sinon son enum FileType fait planter tout le parsing.
      */
     public static ListVersions listVersions(String slugOrId) throws IOException, URISyntaxException {
+        return listVersions(slugOrId, null, null);
+    }
+
+    public static ListVersions listVersions(String slugOrId, @Nullable String gameVersion, @Nullable String loader) throws IOException, URISyntaxException {
+        return ListVersions.fromJson(listVersionsJson(slugOrId, gameVersion, loader));
+    }
+
+    /**
+     * Same as {@link #listVersions(String)} but returns the (file_type-sanitized) raw JSON, which is needed for the
+     * version dependencies: the wrapper reads their keys in camelCase and so always gets null ids.
+     * Also lets Modrinth filter server-side on the game version and/or loader,
+     * so we do not download (and parse) every version of big projects.
+     */
+    public static JsonArray listVersionsJson(String slugOrId, @Nullable String gameVersion, @Nullable String loader) throws IOException, URISyntaxException {
         String encoded = URLEncoder.encode(slugOrId, StandardCharsets.UTF_8).replace("+", "%20");
-        HttpURLConnection con = (HttpURLConnection) new URI(Modrinth.MODRINTH_API_LINK + "/project/" + encoded + "/version").toURL().openConnection();
+
+        StringBuilder url = new StringBuilder(Modrinth.MODRINTH_API_LINK + "/project/" + encoded + "/version");
+        String sep = "?";
+        if (loader != null && !loader.isBlank()) {
+            url.append(sep).append("loaders=").append(URLEncoder.encode("[\"" + loader.toLowerCase() + "\"]", StandardCharsets.UTF_8));
+            sep = "&";
+        }
+        if (gameVersion != null && !gameVersion.isBlank()) {
+            url.append(sep).append("game_versions=").append(URLEncoder.encode("[\"" + gameVersion + "\"]", StandardCharsets.UTF_8));
+        }
+
+        HttpURLConnection con = (HttpURLConnection) new URI(url.toString()).toURL().openConnection();
         con.setRequestMethod("GET");
         con.setRequestProperty("User-Agent", Main.MODRINTH.getUserAgent());
 
@@ -65,6 +90,6 @@ public class ModrinthUtils {
             }
         }
 
-        return ListVersions.fromJson(json);
+        return json;
     }
 }
