@@ -2,6 +2,7 @@ package net.paulem.fjc.gui.browse;
 
 import javafx.embed.swing.SwingFXUtils;
 import javafx.scene.image.Image;
+import net.paulem.fjc.utils.JarMetadata;
 
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
@@ -45,8 +46,13 @@ public final class IconCache {
     private static Optional<Image> load(String url) {
         try {
             byte[] bytes;
-            try (InputStream in = URI.create(url).toURL().openStream()) {
-                bytes = in.readAllBytes();
+            if (url.startsWith("data:")) {
+                // Icon read from a jar and cached inline (see UrlMetaCache)
+                bytes = JarMetadata.decodeDataUri(url);
+            } else {
+                try (InputStream in = URI.create(url).toURL().openStream()) {
+                    bytes = in.readAllBytes();
+                }
             }
             BufferedImage buffered = ImageIO.read(new ByteArrayInputStream(bytes));
             if (buffered != null) return Optional.of(SwingFXUtils.toFXImage(buffered, null));

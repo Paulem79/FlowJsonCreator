@@ -36,9 +36,12 @@ import net.paulem.fjc.gui.components.PropertiesViewerPopup;
 import net.paulem.fjc.gui.model.ModCategory;
 import net.paulem.fjc.gui.model.ModEntry;
 import net.paulem.fjc.utils.CFUtils;
+import net.paulem.fjc.utils.FileUtils;
+import net.paulem.fjc.utils.JarMetadata;
 import net.paulem.fjc.utils.JsonUtils;
 import net.paulem.fjc.utils.ModrinthUtils;
 import net.paulem.fjc.utils.ResolveCache;
+import net.paulem.fjc.utils.UrlMetaCache;
 import org.jetbrains.annotations.Nullable;
 import org.kordamp.ikonli.javafx.FontIcon;
 import org.kordamp.ikonli.material2.Material2AL;
@@ -51,6 +54,7 @@ import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -58,6 +62,7 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.stream.Collectors;
 
 /**
  * The mods of the modpack (everything currently in mods.json) as searchable, sortable cards styled like the
@@ -94,6 +99,8 @@ public class ModsListPanel extends VBox {
 
     private final AtomicBoolean dirty = new AtomicBoolean(false);
     private final AtomicLong generation = new AtomicLong(0);
+    /** URL mods whose jar was already fetched this session, so a failed fetch is not retried on every reload. */
+    private final Set<String> urlFetchAttempted = ConcurrentHashMap.newKeySet();
 
     private ExecutorService bgExecutor;
     private ScheduledExecutorService uiScheduler;
@@ -349,8 +356,9 @@ public class ModsListPanel extends VBox {
         if (!forceRefresh) allEntries.clear();
 
         for (UrlMod url : content.mods) {
-            putEntry(new ModEntry(url, ModCategory.URL, url.name(), formatSize(url.size()), ModEntry.Status.RESOLVED));
+            resolveUrl(url, gen);
         }
+        UrlMetaCache.retainOnly(content.mods.stream().map(UrlMod::sha1).collect(Collectors.toSet()));
 
         for (CurseForgeMod cf : content.curseFiles) {
             resolveCurseForge(cf, gen, forceRefresh);
@@ -359,6 +367,50 @@ public class ModsListPanel extends VBox {
         for (ModrinthMod mr : content.modrinthMods) {
             resolveModrinth(mr, gen, forceRefresh);
         }
+    }
+
+    /**
+     * URL mods have no API to ask: what we know comes from the jar itself. Cached metadata is used right away;
+     * otherwise (mods.json written before this cache existed) the jar is fetched once in the background.
+     */
+    private void resolveUrl(UrlMod url, long gen) {
+        JarMetadata cached = UrlMetaCache.get(url.sha1());
+        putEntry(urlEntry(url, cached));
+        if (cached != null || !urlFetchAttempted.add(url.sha1())) return;
+
+        bgExecutor.submit(() -> {
+            java.io.File tmp = null;
+            try {
+                tmp = java.io.File.createTempFile("fjc-meta-", ".jar");
+                FileUtils.downloadFile(url.downloadURL(), tmp);
+                JarMetadata meta = JarMetadata.read(tmp);
+                UrlMetaCache.put(url.sha1(), meta);
+                // The mod may have been removed, or the list reloaded, while the jar was downloading
+                if (gen != generation.get() || !allEntries.containsKey(url)) return;
+                putEntry(urlEntry(url, meta));
+            } catch (Exception ex) {
+                debug("Métadonnées introuvables pour " + url.downloadURL(), ex);
+            } finally {
+                if (tmp != null) tmp.delete();
+            }
+        });
+    }
+
+    private static ModEntry urlEntry(UrlMod url, @Nullable JarMetadata meta) {
+        String size = formatSize(url.size());
+        if (meta == null) return new ModEntry(url, ModCategory.URL, url.name(), size, ModEntry.Status.RESOLVED);
+
+        String title = meta.name() != null ? meta.name() : url.name();
+        String subtitle = meta.version() != null ? (size != null ? meta.version() + " • " + size : meta.version()) : size;
+        if (meta.description() == null && meta.author() == null && meta.iconDataUri() == null && meta.loader() == null) {
+            return new ModEntry(url, ModCategory.URL, title, subtitle, ModEntry.Status.RESOLVED);
+        }
+        List<String> tags = new ArrayList<>(meta.tags());
+        tags.add("Fichier jar");
+        SearchResult info = new SearchResult(ModCategory.URL, url.sha1(), url.name(), title,
+                meta.description() == null ? "" : meta.description(), meta.author() == null ? "" : meta.author(),
+                meta.iconDataUri(), 0, 0, tags, null, null, null);
+        return new ModEntry(url, ModCategory.URL, title, subtitle, ModEntry.Status.RESOLVED, info);
     }
 
     private void resolveCurseForge(CurseForgeMod cf, long gen, boolean forceRefresh) {
@@ -429,7 +481,7 @@ public class ModsListPanel extends VBox {
         ensureExecutorsStarted();
         long gen = generation.get();
         if (mod instanceof UrlMod url) {
-            putEntry(new ModEntry(url, ModCategory.URL, url.name(), formatSize(url.size()), ModEntry.Status.RESOLVED));
+            resolveUrl(url, gen);
         } else if (mod instanceof CurseForgeMod cf) {
             resolveCurseForge(cf, gen, false);
         } else if (mod instanceof ModrinthMod mr) {

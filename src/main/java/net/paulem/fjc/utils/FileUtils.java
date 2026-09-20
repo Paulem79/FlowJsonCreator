@@ -85,6 +85,9 @@ public class FileUtils {
             }
             size.set(file.length());
 
+            // Read the jar's own metadata (icon, description...) while we have it, so it is never downloaded again.
+            UrlMetaCache.put(sha1.get(), JarMetadata.read(file));
+
             file.delete();
 
             after.accept(new UrlMod(fileName, jarUrl, sha1.get(), size.get()));

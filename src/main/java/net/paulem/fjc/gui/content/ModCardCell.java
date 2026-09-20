@@ -163,10 +163,13 @@ public class ModCardCell extends ListCell<ModEntry> {
         }
 
         if (info != null) {
-            HBox stats = new HBox(12, CardParts.stat(Material2AL.CLOUD_DOWNLOAD, ManipulationUtils.formatCount(info.downloads())));
-            if (info.follows() > 0) stats.getChildren().add(CardParts.stat(Material2AL.FAVORITE_BORDER, ManipulationUtils.formatCount(info.follows())));
-            stats.setAlignment(Pos.CENTER_RIGHT);
-            right.getChildren().add(stats);
+            // URL mods come from a jar: there are no download/like counts to show
+            if (entry.getCategory() != ModCategory.URL) {
+                HBox stats = new HBox(12, CardParts.stat(Material2AL.CLOUD_DOWNLOAD, ManipulationUtils.formatCount(info.downloads())));
+                if (info.follows() > 0) stats.getChildren().add(CardParts.stat(Material2AL.FAVORITE_BORDER, ManipulationUtils.formatCount(info.follows())));
+                stats.setAlignment(Pos.CENTER_RIGHT);
+                right.getChildren().add(stats);
+            }
 
             if (info.dateModified() != null) {
                 HBox date = CardParts.stat(Material2AL.HISTORY, ManipulationUtils.relativeDate(info.dateModified()));
