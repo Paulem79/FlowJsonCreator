@@ -1,28 +1,37 @@
 package net.paulem.fjc.gui.content;
 
+import io.github.matyrobbrt.curseforgeapi.schemas.file.File;
 import javafx.application.Platform;
-import javafx.beans.binding.Bindings;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.collections.transformation.FilteredList;
 import javafx.collections.transformation.SortedList;
-import javafx.geometry.Insets;
 import javafx.geometry.Pos;
-import javafx.scene.control.*;
+import javafx.scene.control.Alert;
 import javafx.scene.control.Alert.AlertType;
+import javafx.scene.control.Button;
+import javafx.scene.control.ButtonType;
+import javafx.scene.control.ComboBox;
+import javafx.scene.control.Label;
+import javafx.scene.control.ListView;
+import javafx.scene.control.TextField;
+import javafx.scene.control.ToggleButton;
+import javafx.scene.control.Tooltip;
 import javafx.scene.input.KeyCode;
-import javafx.scene.input.MouseButton;
+import javafx.scene.layout.FlowPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
-import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
 import javafx.stage.Stage;
+import net.paulem.fjc.flow.ModsJson;
 import net.paulem.fjc.flow.mod.CurseForgeMod;
 import net.paulem.fjc.flow.mod.Mod;
 import net.paulem.fjc.flow.mod.ModrinthMod;
 import net.paulem.fjc.flow.mod.UrlMod;
-import net.paulem.fjc.flow.ModsJson;
+import net.paulem.fjc.gui.browse.CurseForgeSource;
+import net.paulem.fjc.gui.browse.ModrinthSource;
+import net.paulem.fjc.gui.browse.SearchResult;
 import net.paulem.fjc.gui.components.PropertiesViewerPopup;
 import net.paulem.fjc.gui.model.ModCategory;
 import net.paulem.fjc.gui.model.ModEntry;
@@ -36,18 +45,23 @@ import org.kordamp.ikonli.material2.Material2AL;
 import org.kordamp.ikonli.material2.Material2MZ;
 import ovh.paulem.modrinthapi.types.project.Project;
 
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.EnumMap;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.*;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
- * The visual heart of the app: a searchable, sortable, foldable-by-category list of every mod
- * currently in mods.json, with live icons and background name resolution against the
- * CurseForge/Modrinth APIs.
+ * The mods of the modpack (everything currently in mods.json) as searchable, sortable cards styled like the
+ * search results, with icons/descriptions/stats resolved in the background from the CurseForge/Modrinth APIs.
  * <p>
  * Every mod is tracked by a {@link Mod} identity (never by a parsed display string), which is
  * what makes add/remove/search safe even for mods whose resolved name contains punctuation.
@@ -55,10 +69,28 @@ import java.util.concurrent.atomic.AtomicLong;
 public class ModsListPanel extends VBox {
     private static final boolean DEBUG = Boolean.parseBoolean(System.getProperty("fjc.debug", "false"));
 
+    private enum Sort {
+        NAME_ASC("Nom (A → Z)"),
+        NAME_DESC("Nom (Z → A)"),
+        DOWNLOADS("Téléchargements"),
+        UPDATED("Dernière mise à jour"),
+        SOURCE("Source");
+
+        private final String label;
+
+        Sort(String label) {
+            this.label = label;
+        }
+
+        @Override
+        public String toString() {
+            return label;
+        }
+    }
+
     private final Stage stage;
 
     private final Map<Mod, ModEntry> allEntries = new ConcurrentHashMap<>();
-    private final Map<ModCategory, CategorySection> sections = new EnumMap<>(ModCategory.class);
 
     private final AtomicBoolean dirty = new AtomicBoolean(false);
     private final AtomicLong generation = new AtomicLong(0);
@@ -68,13 +100,32 @@ public class ModsListPanel extends VBox {
     private volatile boolean executorsStarted = false;
 
     private final TextField searchField = new TextField();
+    private final ComboBox<Sort> sortBox = new ComboBox<>();
+    private final Map<ModCategory, ToggleButton> sourceToggles = new EnumMap<>(ModCategory.class);
     private final Label totalCountLabel = new Label();
-    private final Button sortButton = new Button();
-    private boolean sortAscending = true;
+    private final Label placeholder = new Label();
+
+    // Only touched on the FX thread
+    private final ObservableList<ModEntry> master = FXCollections.observableArrayList();
+    private final FilteredList<ModEntry> filtered = new FilteredList<>(master, e -> true);
+    private final SortedList<ModEntry> sorted = new SortedList<>(filtered);
+    private final ListView<ModEntry> listView = new ListView<>(sorted);
+
+    private final ModCardCell.Host cardHost = new ModCardCell.Host() {
+        @Override
+        public void showDetails(ModEntry entry) {
+            showProperties(entry);
+        }
+
+        @Override
+        public void confirmAndRemove(ModEntry entry) {
+            ModsListPanel.this.confirmAndRemove(entry);
+        }
+    };
 
     public ModsListPanel(Stage stage) {
         this.stage = stage;
-        setSpacing(8);
+        setSpacing(10);
         buildUi();
     }
 
@@ -94,252 +145,103 @@ public class ModsListPanel extends VBox {
     // ------------------------------------------------------------------
 
     private void buildUi() {
-        // ---- Toolbar: search + sort + refresh + total count ----
-        HBox toolbar = new HBox(8);
-        toolbar.setAlignment(Pos.CENTER_LEFT);
-
-        FontIcon searchIcon = FontIcon.of(Material2MZ.SEARCH, 16, Color.GRAY);
-        searchField.setPromptText("Rechercher un mod...");
-        searchField.setPrefColumnCount(14);
-        HBox.setHgrow(searchField, Priority.ALWAYS);
-        HBox searchBox = new HBox(6, searchIcon, searchField);
+        searchField.setPromptText("Rechercher dans le modpack...");
+        searchField.setPrefColumnCount(24);
+        HBox searchBox = new HBox(6, FontIcon.of(Material2MZ.SEARCH, 16), searchField);
         searchBox.setAlignment(Pos.CENTER_LEFT);
-        HBox.setHgrow(searchBox, Priority.ALWAYS);
+        HBox.setHgrow(searchField, Priority.ALWAYS);
 
-        Button clearSearchBtn = new Button();
-        clearSearchBtn.setGraphic(FontIcon.of(Material2AL.CLEAR, 14));
-        clearSearchBtn.getStyleClass().add("button-icon");
-        clearSearchBtn.setTooltip(new Tooltip("Effacer la recherche"));
-        clearSearchBtn.setOnAction(e -> searchField.clear());
+        sortBox.getItems().addAll(Sort.values());
+        sortBox.setValue(Sort.NAME_ASC);
+        sortBox.setTooltip(new Tooltip("Trier les mods"));
 
-        sortButton.setGraphic(FontIcon.of(Material2MZ.SORT_BY_ALPHA, 16));
-        sortButton.setTooltip(new Tooltip("Trier de A à Z / Z à A"));
-        sortButton.getStyleClass().add("button-icon");
-        sortButton.setOnAction(e -> {
-            sortAscending = !sortAscending;
-            applySort();
-        });
+        // Which sources to show: same colored buttons as in the search tab.
+        FlowPane toolbar = new FlowPane(10, 8, searchBox, sortBox);
+        toolbar.setAlignment(Pos.CENTER_LEFT);
+        for (ModCategory category : ModCategory.values()) {
+            ToggleButton toggle = new ToggleButton(category.getLabel(), FontIcon.of(category.getIcon(), 14, category.getColor()));
+            toggle.setSelected(true);
+            toggle.setTooltip(new Tooltip("Afficher / masquer les mods " + category.getLabel()));
+            toggle.setOnAction(e -> applyFilter());
+            sourceToggles.put(category, toggle);
+            toolbar.getChildren().add(toggle);
+        }
 
-        Button refreshBtn = new Button();
-        refreshBtn.setGraphic(FontIcon.of(Material2MZ.REFRESH, 16));
-        refreshBtn.setTooltip(new Tooltip("Rafraîchir les noms depuis Modrinth/CurseForge"));
-        refreshBtn.getStyleClass().add("button-icon");
+        Button refreshBtn = new Button("Actualiser", FontIcon.of(Material2MZ.REFRESH, 14));
+        refreshBtn.setTooltip(new Tooltip("Rafraîchir les infos depuis Modrinth/CurseForge"));
         refreshBtn.setOnAction(e -> refreshAll());
-
-        toolbar.getChildren().addAll(searchBox, clearSearchBtn, sortButton, refreshBtn);
+        toolbar.getChildren().add(refreshBtn);
 
         totalCountLabel.getStyleClass().add("text-muted");
+        placeholder.getStyleClass().add("text-muted");
 
-        // ---- One foldable section per category ----
-        VBox sectionsBox = new VBox(6);
-        for (ModCategory category : ModCategory.values()) {
-            CategorySection section = new CategorySection(category);
-            sections.put(category, section);
-            sectionsBox.getChildren().add(section.pane);
-        }
-
-        ScrollPane scrollPane = new ScrollPane(sectionsBox);
-        scrollPane.setFitToWidth(true);
-        scrollPane.setPrefViewportHeight(320);
-        VBox.setVgrow(scrollPane, Priority.ALWAYS);
-
-        getChildren().addAll(toolbar, scrollPane, totalCountLabel);
-
-        searchField.textProperty().addListener((obs, oldV, newV) -> onSearchChanged(newV));
-        applySort();
-    }
-
-    private class CategorySection {
-        final ModCategory category;
-        final ObservableList<ModEntry> master = FXCollections.observableArrayList();
-        final FilteredList<ModEntry> filtered = new FilteredList<>(master, e -> true);
-        final SortedList<ModEntry> sorted = new SortedList<>(filtered);
-        final ListView<ModEntry> listView = new ListView<>(sorted);
-        final TitledPane pane = new TitledPane();
-        final Label countLabel = new Label("0");
-        final Label emptyLabel;
-        boolean lastUserExpanded = true;
-        boolean programmaticExpand = false;
-
-        CategorySection(ModCategory category) {
-            this.category = category;
-
-            FontIcon icon = FontIcon.of(category.getIcon(), 16, category.getColor());
-            Label titleLabel = new Label(category.getLabel());
-            titleLabel.setStyle("-fx-font-weight: bold;");
-            countLabel.getStyleClass().add("text-muted");
-            Region spacer = new Region();
-            HBox.setHgrow(spacer, Priority.ALWAYS);
-            HBox header = new HBox(8, icon, titleLabel, countLabel);
-            header.setAlignment(Pos.CENTER_LEFT);
-
-            pane.setGraphic(header);
-            pane.setText(null);
-            pane.setExpanded(true);
-            pane.setAnimated(false);
-
-            emptyLabel = new Label("Aucun mod " + category.getLabel() + " pour le moment.");
-            emptyLabel.getStyleClass().add("text-muted");
-            emptyLabel.setPadding(new Insets(6, 0, 6, 4));
-
-            listView.setPrefHeight(140);
-            listView.setPlaceholder(emptyLabel);
-            listView.setCellFactory(lv -> new ModEntryCell());
-
-            VBox content = new VBox(listView);
-            pane.setContent(content);
-
-            countLabel.textProperty().bind(Bindings.size(filtered).asString("(%d)"));
-
-            pane.expandedProperty().addListener((obs, wasExpanded, isExpanded) -> {
-                if (!programmaticExpand && searchField.getText().isBlank()) {
-                    lastUserExpanded = isExpanded;
-                }
-            });
-
-            listView.setOnKeyPressed(ke -> {
-                if (ke.getCode() == KeyCode.DELETE || ke.getCode() == KeyCode.BACK_SPACE) {
-                    ModEntry selected = listView.getSelectionModel().getSelectedItem();
-                    if (selected != null) confirmAndRemove(selected);
-                }
-            });
-
-            listView.setOnMouseClicked(me -> {
+        listView.getStyleClass().add("browse-list");
+        listView.setCellFactory(lv -> new ModCardCell(cardHost));
+        listView.setPlaceholder(placeholder);
+        VBox.setVgrow(listView, Priority.ALWAYS);
+        listView.setOnKeyPressed(ke -> {
+            if (ke.getCode() == KeyCode.DELETE || ke.getCode() == KeyCode.BACK_SPACE) {
                 ModEntry selected = listView.getSelectionModel().getSelectedItem();
-                if (selected == null) return;
-                if (me.getButton() == MouseButton.PRIMARY && me.getClickCount() == 2) {
-                    showProperties(selected);
-                }
-            });
-        }
-
-        void setExpandedProgrammatically(boolean expanded) {
-            programmaticExpand = true;
-            pane.setExpanded(expanded);
-            programmaticExpand = false;
-        }
-    }
-
-    private class ModEntryCell extends ListCell<ModEntry> {
-        private final FontIcon statusIcon = new FontIcon();
-        private final ProgressIndicator spinner = new ProgressIndicator();
-        private final Label titleLabel = new Label();
-        private final Label subtitleLabel = new Label();
-        private final VBox textBox = new VBox(1, titleLabel, subtitleLabel);
-        private final Region spacer = new Region();
-        private final Button infoBtn = new Button();
-        private final Button deleteBtn = new Button();
-        private final HBox graphic = new HBox(8);
-
-        ModEntryCell() {
-            spinner.setPrefSize(14, 14);
-            spinner.setMaxSize(14, 14);
-
-            titleLabel.getStyleClass().add("mod-title");
-            subtitleLabel.getStyleClass().add("text-muted");
-            subtitleLabel.setStyle("-fx-font-size: 0.85em;");
-
-            HBox.setHgrow(spacer, Priority.ALWAYS);
-
-            infoBtn.setGraphic(FontIcon.of(Material2AL.INFO, 14));
-            infoBtn.getStyleClass().add("button-icon");
-            infoBtn.setTooltip(new Tooltip("Voir les détails"));
-            infoBtn.setOnAction(e -> {
-                ModEntry item = getItem();
-                if (item != null) showProperties(item);
-            });
-
-            deleteBtn.setGraphic(FontIcon.of(Material2AL.DELETE, 14, Color.web("#e05252")));
-            deleteBtn.getStyleClass().add("button-icon");
-            deleteBtn.setTooltip(new Tooltip("Supprimer"));
-            deleteBtn.setOnAction(e -> {
-                ModEntry item = getItem();
-                if (item != null) confirmAndRemove(item);
-            });
-
-            graphic.setAlignment(Pos.CENTER_LEFT);
-            graphic.getChildren().addAll(textBox, spacer, infoBtn, deleteBtn);
-
-            ContextMenu menu = new ContextMenu();
-            MenuItem viewItem = new MenuItem("Voir les détails", FontIcon.of(Material2AL.INFO, 14));
-            viewItem.setOnAction(e -> {
-                ModEntry item = getItem();
-                if (item != null) showProperties(item);
-            });
-            MenuItem deleteItem = new MenuItem("Supprimer", FontIcon.of(Material2AL.DELETE, 14));
-            deleteItem.setOnAction(e -> {
-                ModEntry item = getItem();
-                if (item != null) confirmAndRemove(item);
-            });
-            menu.getItems().addAll(viewItem, deleteItem);
-            setContextMenu(menu);
-        }
-
-        @Override
-        protected void updateItem(ModEntry entry, boolean empty) {
-            super.updateItem(entry, empty);
-            if (empty || entry == null) {
-                setGraphic(null);
-                setTooltip(null);
-                return;
+                if (selected != null) confirmAndRemove(selected);
             }
+        });
 
-            titleLabel.setText(entry.getTitle());
-            subtitleLabel.setText(entry.getSubtitle() == null ? "" : entry.getSubtitle());
-            subtitleLabel.setManaged(entry.getSubtitle() != null && !entry.getSubtitle().isBlank());
-            subtitleLabel.setVisible(subtitleLabel.isManaged());
+        getChildren().addAll(toolbar, listView, totalCountLabel);
 
-            graphic.getChildren().remove(spinner);
-            graphic.getChildren().remove(statusIcon);
-            switch (entry.getStatus()) {
-                case LOADING -> graphic.getChildren().add(0, spinner);
-                case ERROR -> {
-                    statusIcon.setIconCode(Material2MZ.WARNING);
-                    statusIcon.setIconColor(Color.web("#e0a028"));
-                    statusIcon.setIconSize(16);
-                    graphic.getChildren().add(0, statusIcon);
-                }
-                case RESOLVED -> {
-                }
-            }
-
-            setTooltip(new Tooltip(entry.getTitle() + (entry.getSubtitle() != null ? "\n" + entry.getSubtitle() : "")));
-            setGraphic(graphic);
-        }
+        searchField.textProperty().addListener((obs, oldV, newV) -> applyFilter());
+        sortBox.setOnAction(e -> applySort());
+        filtered.addListener((javafx.collections.ListChangeListener<ModEntry>) c -> updateCount());
+        applySort();
+        updateCount();
     }
 
     // ------------------------------------------------------------------
-    // Search / sort / fold behaviour
+    // Search / sort / source filter
     // ------------------------------------------------------------------
 
-    private void onSearchChanged(String query) {
-        String q = query == null ? "" : query.trim().toLowerCase();
-        boolean searching = !q.isEmpty();
-
-        for (CategorySection section : sections.values()) {
-            section.filtered.setPredicate(entry -> matches(entry, q));
-
-            if (searching) {
-                section.setExpandedProgrammatically(!section.filtered.isEmpty());
-            } else {
-                section.setExpandedProgrammatically(section.lastUserExpanded);
-            }
-        }
+    private void applyFilter() {
+        String q = searchField.getText() == null ? "" : searchField.getText().trim().toLowerCase();
+        filtered.setPredicate(entry -> {
+            ToggleButton toggle = sourceToggles.get(entry.getCategory());
+            if (toggle != null && !toggle.isSelected()) return false;
+            return matches(entry, q);
+        });
+        updateCount();
     }
 
     private boolean matches(ModEntry entry, String query) {
         if (query.isEmpty()) return true;
         if (entry.getTitle().toLowerCase().contains(query)) return true;
-        return entry.getSubtitle() != null && entry.getSubtitle().toLowerCase().contains(query);
+        if (entry.getSubtitle() != null && entry.getSubtitle().toLowerCase().contains(query)) return true;
+
+        SearchResult info = entry.getInfo();
+        if (info == null) return false;
+        return info.description().toLowerCase().contains(query)
+                || info.author().toLowerCase().contains(query)
+                || info.tags().stream().anyMatch(tag -> tag.toLowerCase().contains(query));
     }
 
     private void applySort() {
-        sortButton.setTooltip(new Tooltip(sortAscending ? "Trié de A à Z (cliquer pour Z à A)" : "Trié de Z à A (cliquer pour A à Z)"));
-        Comparator<ModEntry> cmp = Comparator.comparing(e -> e.getTitle().toLowerCase());
-        if (!sortAscending) cmp = cmp.reversed();
-        for (CategorySection section : sections.values()) {
-            section.sorted.setComparator(cmp);
-        }
+        Comparator<ModEntry> byName = Comparator.comparing(e -> e.getTitle().toLowerCase());
+        Comparator<ModEntry> cmp = switch (sortBox.getValue()) {
+            case NAME_ASC -> byName;
+            case NAME_DESC -> byName.reversed();
+            case DOWNLOADS -> Comparator.comparingLong((ModEntry e) -> e.getInfo() == null ? -1 : e.getInfo().downloads())
+                    .reversed().thenComparing(byName);
+            case UPDATED -> Comparator.comparing((ModEntry e) -> e.getInfo() == null ? null : e.getInfo().dateModified(),
+                    Comparator.nullsLast(Comparator.<java.time.Instant>reverseOrder())).thenComparing(byName);
+            case SOURCE -> Comparator.comparing(ModEntry::getCategory).thenComparing(byName);
+        };
+        sorted.setComparator(cmp);
+    }
+
+    private void updateCount() {
+        int total = master.size();
+        int shown = filtered.size();
+        totalCountLabel.setText(shown == total ? total + " mod(s) au total" : shown + " affiché(s) sur " + total + " mod(s)");
+        placeholder.setText(total == 0
+                ? "Aucun mod dans le modpack pour le moment. Ajoutes-en depuis l'onglet Recherche."
+                : "Aucun mod ne correspond à ta recherche.");
     }
 
     // ------------------------------------------------------------------
@@ -348,8 +250,8 @@ public class ModsListPanel extends VBox {
 
     private void confirmAndRemove(ModEntry entry) {
         Alert confirm = new Alert(AlertType.CONFIRMATION);
-        confirm.setTitle("Supprimer un mod");
-        confirm.setHeaderText("Supprimer \"" + entry.getTitle() + "\" ?");
+        confirm.setTitle("Retirer un mod");
+        confirm.setHeaderText("Retirer \"" + entry.getTitle() + "\" ?");
         confirm.setContentText("Cette action retire le mod du mods.json. Elle est irréversible.");
         confirm.initOwner(stage);
         confirm.showAndWait().ifPresent(response -> {
@@ -360,7 +262,9 @@ public class ModsListPanel extends VBox {
     }
 
     private void showProperties(ModEntry entry) {
-        new PropertiesViewerPopup(stage).showPopup(entry.getSource());
+        // The resolved project has far more to show than the bare mods.json reference.
+        SearchResult info = entry.getInfo();
+        new PropertiesViewerPopup(stage).showPopup(info != null && info.raw() != null ? info.raw() : entry.getSource());
     }
 
     // ------------------------------------------------------------------
@@ -389,16 +293,38 @@ public class ModsListPanel extends VBox {
 
     private void pushIfDirty() {
         if (!dirty.getAndSet(false)) return;
-        Map<ModCategory, List<ModEntry>> byCategory = new EnumMap<>(ModCategory.class);
-        for (ModCategory category : ModCategory.values()) byCategory.put(category, new java.util.ArrayList<>());
-        for (ModEntry entry : allEntries.values()) byCategory.get(entry.getCategory()).add(entry);
+        Map<Mod, ModEntry> snapshot = new HashMap<>(allEntries);
+        Platform.runLater(() -> applySnapshot(snapshot));
+    }
 
-        Platform.runLater(() -> {
-            for (ModCategory category : ModCategory.values()) {
-                sections.get(category).master.setAll(byCategory.get(category));
+    /**
+     * Brings the displayed list in line with the resolved entries by adding, replacing and removing only what
+     * changed (rather than resetting the whole list), so the scroll position survives while names resolve.
+     */
+    private void applySnapshot(Map<Mod, ModEntry> snapshot) {
+        Map<Mod, Integer> index = new HashMap<>();
+        for (int i = 0; i < master.size(); i++) index.put(master.get(i).getSource(), i);
+
+        boolean changed = false;
+        List<ModEntry> toAdd = new ArrayList<>();
+        for (ModEntry entry : snapshot.values()) {
+            Integer i = index.get(entry.getSource());
+            if (i == null) {
+                toAdd.add(entry);
+            } else if (master.get(i) != entry) {
+                master.set(i, entry);
+                changed = true;
             }
-            totalCountLabel.setText(allEntries.size() + " mod(s) au total");
-        });
+        }
+        if (!toAdd.isEmpty()) {
+            master.addAll(toAdd);
+            changed = true;
+        }
+        if (master.removeIf(entry -> !snapshot.containsKey(entry.getSource()))) changed = true;
+
+        // ModEntry equality is by mod identity, so cells would not notice a replaced (equal) entry on their own.
+        if (changed) listView.refresh();
+        updateCount();
     }
 
     private void putEntry(ModEntry entry) {
@@ -454,7 +380,13 @@ public class ModsListPanel extends VBox {
                     return;
                 }
                 ResolveCache.putCurseForgeName(cf.projectID(), resolved.name());
-                putEntry(new ModEntry(cf, ModCategory.CURSEFORGE, resolved.name(), subtitle, ModEntry.Status.RESOLVED));
+
+                // The pinned file's own name says more than its id; keep the id if that lookup fails.
+                File file = CFUtils.getFileFromId(cf.projectID(), cf.fileID());
+                String version = file != null ? file.displayName() : subtitle;
+                if (gen != generation.get()) return;
+                putEntry(new ModEntry(cf, ModCategory.CURSEFORGE, resolved.name(), version, ModEntry.Status.RESOLVED,
+                        CurseForgeSource.toResult(resolved)));
             } catch (Exception ex) {
                 if (gen != generation.get()) return;
                 debug("Erreur réseau CF pour projectID=" + cf.projectID() + ", fileID=" + cf.fileID(), ex);
@@ -482,7 +414,8 @@ public class ModsListPanel extends VBox {
                     return;
                 }
                 ResolveCache.putModrinthName(mr.getProjectReference(), resolved.title());
-                putEntry(new ModEntry(mr, ModCategory.MODRINTH, resolved.title(), subtitle, ModEntry.Status.RESOLVED));
+                putEntry(new ModEntry(mr, ModCategory.MODRINTH, resolved.title(), subtitle, ModEntry.Status.RESOLVED,
+                        ModrinthSource.fromProject(resolved)));
             } catch (Exception ex) {
                 if (gen != generation.get()) return;
                 debug("Erreur réseau Modrinth pour slug=" + mr.getProjectReference() + ", version=" + mr.getVersionNumber(), ex);
@@ -491,7 +424,7 @@ public class ModsListPanel extends VBox {
         });
     }
 
-    /** Incrementally add a single freshly-added mod (from a search container or a manifest import). */
+    /** Incrementally add a single freshly-added mod (from the search tab or a manifest import). */
     public void addMod(Mod mod) {
         ensureExecutorsStarted();
         long gen = generation.get();

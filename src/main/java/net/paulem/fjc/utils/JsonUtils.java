@@ -10,7 +10,10 @@ import net.paulem.fjc.flow.ModsJson;
 
 import java.io.*;
 import java.lang.reflect.Type;
+import javafx.application.Platform;
+
 import java.util.List;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 import static net.paulem.fjc.Main.jsonContent;
 import static net.paulem.fjc.Main.modsListPanel;
@@ -19,6 +22,17 @@ import static net.paulem.fjc.utils.FileUtils.getActualJar;
 public class JsonUtils {
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
     public static final File modsJson = getActualJar().getParent().resolve("mods.json").toFile();
+
+    private static final List<Runnable> CHANGE_LISTENERS = new CopyOnWriteArrayList<>();
+
+    /** Registers a callback run (on the FX thread) whenever a mod is added to or removed from mods.json. */
+    public static void addChangeListener(Runnable listener) {
+        CHANGE_LISTENERS.add(listener);
+    }
+
+    private static void notifyChanged() {
+        for (Runnable listener : CHANGE_LISTENERS) Platform.runLater(listener);
+    }
 
     public static final Type CURSE_FORGE_MANIFEST_TYPE = new TypeToken<CurseForgeManifest>() {}.getType();
 
@@ -58,6 +72,7 @@ public class JsonUtils {
         try {
             if (modsListPanel != null) modsListPanel.addMod(mod); // mise à jour incrémentale
             saveFile(jsonContent);
+            notifyChanged();
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
@@ -76,6 +91,7 @@ public class JsonUtils {
 
         try {
             saveFile(jsonContent);
+            notifyChanged();
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
@@ -91,6 +107,7 @@ public class JsonUtils {
         try {
             if (modsListPanel != null) modsListPanel.removeMod(mod); // mise à jour incrémentale
             saveFile(jsonContent);
+            notifyChanged();
         } catch (IOException e) {
             throw new RuntimeException(e);
         }

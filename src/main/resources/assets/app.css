@@ -1,0 +1,56 @@
+/* Result cards of the mod browser (AtlantaFX looked-up colors keep it in sync with the theme). */
+
+.browse-list {
+    -fx-background-color: transparent;
+    -fx-padding: 0;
+}
+
+.browse-list .list-cell,
+.browse-list .list-cell:filled:hover,
+.browse-list .list-cell:filled:selected,
+.browse-list .list-cell:filled:selected:hover {
+    -fx-background-color: transparent;
+    -fx-padding: 3 6 3 0;
+}
+
+.mod-card {
+    -fx-background-color: -color-bg-subtle;
+    -fx-background-radius: 8;
+    -fx-padding: 12;
+    -fx-cursor: hand;
+}
+
+.mod-card:hover {
+    -fx-background-color: -color-neutral-subtle;
+}
+
+.mod-icon {
+    -fx-background-color: -color-neutral-muted;
+    -fx-background-radius: 12;
+}
+
+.mod-tag {
+    -fx-background-color: -color-neutral-muted;
+    -fx-background-radius: 10;
+    -fx-padding: 1 8;
+    -fx-font-size: 0.8em;
+}
+
+.mod-versions {
+    -fx-background-color: -color-bg-inset;
+    -fx-background-radius: 8;
+}
+
+.installed-badge {
+    -fx-text-fill: -color-success-fg;
+    -fx-font-weight: bold;
+}
+
+.installed-badge .ikonli-font-icon {
+    -fx-icon-color: -color-success-fg;
+}
+
+/* The selected card (used by the Delete key in the modpack list). */
+.browse-list .list-cell:filled:selected .mod-card {
+    -fx-background-color: -color-accent-subtle;
+}

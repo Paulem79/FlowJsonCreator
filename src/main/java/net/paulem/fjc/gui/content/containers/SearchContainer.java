@@ -22,7 +22,7 @@ import java.util.concurrent.Executors;
  * Abstract base class for creating containers that manage a GridPane and are used to add a Mod.
  */
 public abstract class SearchContainer {
-    private static final ExecutorService EXECUTOR = Executors.newCachedThreadPool(r -> {
+    public static final ExecutorService EXECUTOR = Executors.newCachedThreadPool(r -> {
         Thread t = new Thread(r, "fjc-search-worker");
         t.setDaemon(true);
         return t;
