@@ -54,6 +54,7 @@ dependencies {
 
 application {
     mainClass.set("$group.Main")
+    applicationDefaultJvmArgs = listOf("-Dfile.encoding=UTF-8", "--add-exports=javafx.graphics/com.sun.glass.ui=ALL-UNNAMED", "--add-opens=javafx.graphics/javafx.scene.layout=ALL-UNNAMED")
 }
 
 tasks.withType<JavaCompile>().configureEach {
@@ -164,6 +165,15 @@ tasks.shadowJar {
 
     archiveVersion.set("")
     archiveClassifier.set("")
+
+    // Honoured by `java -jar`, where the jvmOpts above are not applied
+    manifest {
+        attributes(
+            "Main-Class" to application.mainClass.get(),
+            "Add-Exports" to "javafx.graphics/com.sun.glass.ui",
+            "Add-Opens" to "javafx.graphics/javafx.scene.layout"
+        )
+    }
 }
 
 tasks.register<Delete>("deleteDist") {

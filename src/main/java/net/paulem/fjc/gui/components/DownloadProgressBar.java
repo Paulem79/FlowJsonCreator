@@ -34,6 +34,15 @@ public class DownloadProgressBar {
     private final File file;
     private final Runnable onFinish;
     private volatile IOException downloadError;
+    private boolean taskbarAvailable = isTaskbarSupported();
+
+    private static boolean isTaskbarSupported() {
+        try {
+            return TaskbarProgressbar.isSupported();
+        } catch (IllegalAccessError | RuntimeException e) {
+            return false;
+        }
+    }
 
     public DownloadProgressBar(String downloadUrl, File file, Runnable onFinish) {
         this.downloadUrl = downloadUrl;
@@ -71,8 +80,12 @@ public class DownloadProgressBar {
         };
         downloadThread.addListener(() -> {
             Platform.runLater(() -> {
-                if(TaskbarProgressbar.isSupported())
-                    TaskbarProgressbar.stopProgress(popupStage);
+                if(taskbarAvailable) {
+                    try {
+                        TaskbarProgressbar.stopProgress(popupStage);
+                    } catch (IllegalAccessError | RuntimeException ignored) {
+                    }
+                }
                 popupStage.close();
 
                 if (downloadError != null) {
@@ -119,8 +132,13 @@ public class DownloadProgressBar {
                             : formatSize(downloadedSoFar) + " téléchargés...");
 
                     progressBarUpdate.getAndIncrement();
-                    if(progressBarUpdate.get() == 5 && TaskbarProgressbar.isSupported()) {
-                        TaskbarProgressbar.showCustomProgress(popupStage, Math.max(currentProgress, 0), TaskbarProgressbar.Type.NORMAL);
+                    if(progressBarUpdate.get() == 5 && taskbarAvailable) {
+                        try {
+                            TaskbarProgressbar.showCustomProgress(popupStage, Math.max(currentProgress, 0), TaskbarProgressbar.Type.NORMAL);
+                        } catch (IllegalAccessError | RuntimeException e) {
+                            // Cosmetic only: missing --add-exports for com.sun.glass.ui must not break the download
+                            taskbarAvailable = false;
+                        }
                         progressBarUpdate.set(0);
                     }
                 });
