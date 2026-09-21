@@ -98,6 +98,28 @@ public class JsonUtils {
     }
 
     /**
+     * Swap each mod (key) for its replacement (value) in place, saving the file only once at the end.
+     * Used to apply updates. Mods no longer in the file are skipped.
+     * @param replacements old mod -> new mod.
+     */
+    public static void replaceMods(java.util.Map<Mod, Mod> replacements) {
+        for (java.util.Map.Entry<Mod, Mod> replacement : replacements.entrySet()) {
+            if (!jsonContent.replaceMod(replacement.getKey(), replacement.getValue())) continue;
+            if (modsListPanel != null) {
+                modsListPanel.removeMod(replacement.getKey());
+                modsListPanel.addMod(replacement.getValue());
+            }
+        }
+
+        try {
+            saveFile(jsonContent);
+            notifyChanged();
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    /**
      * Remove a mod from the json file, update the list and save the file.
      * @param mod The mod to remove.
      */

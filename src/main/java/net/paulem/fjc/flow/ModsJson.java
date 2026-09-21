@@ -63,6 +63,21 @@ public class ModsJson {
         }
     }
 
+    /** Swaps a mod for another of the same kind, keeping its position. @return false if {@code old} is not in the list. */
+    public boolean replaceMod(Mod old, Mod replacement) {
+        if (old instanceof UrlMod && replacement instanceof UrlMod url) return replaceIn(this.mods, (UrlMod) old, url);
+        if (old instanceof CurseForgeMod && replacement instanceof CurseForgeMod cf) return replaceIn(this.curseFiles, (CurseForgeMod) old, cf);
+        if (old instanceof ModrinthMod && replacement instanceof ModrinthMod mr) return replaceIn(this.modrinthMods, (ModrinthMod) old, mr);
+        return false;
+    }
+
+    private static <T> boolean replaceIn(List<T> list, T old, T replacement) {
+        int index = list.indexOf(old);
+        if (index < 0) return false;
+        list.set(index, replacement);
+        return true;
+    }
+
     /** The Modrinth entry for a project, whatever its version. The reference may be a project id or a slug. */
     @Nullable
     public ModrinthMod findModrinth(String id, String slug) {

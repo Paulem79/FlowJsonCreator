@@ -20,7 +20,9 @@ import net.paulem.fjc.gui.browse.CardParts;
 import net.paulem.fjc.gui.browse.SearchResult;
 import net.paulem.fjc.gui.model.ModCategory;
 import net.paulem.fjc.gui.model.ModEntry;
+import net.paulem.fjc.update.UpdateInfo;
 import net.paulem.fjc.utils.ManipulationUtils;
+import org.jetbrains.annotations.Nullable;
 import org.kordamp.ikonli.javafx.FontIcon;
 import org.kordamp.ikonli.material2.Material2AL;
 import org.kordamp.ikonli.material2.Material2MZ;
@@ -37,6 +39,10 @@ public class ModCardCell extends ListCell<ModEntry> {
         void showDetails(ModEntry entry);
 
         void confirmAndRemove(ModEntry entry);
+
+        /** The newer version available for this mod, if any. */
+        @Nullable
+        UpdateInfo updateFor(ModEntry entry);
     }
 
     private static final int MAX_TAGS = 4;
@@ -83,6 +89,11 @@ public class ModCardCell extends ListCell<ModEntry> {
         titleRow.setAlignment(Pos.CENTER_LEFT);
         if (info != null && !info.author().isBlank()) titleRow.getChildren().add(CardParts.muted("par " + info.author()));
         titleRow.getChildren().add(CardParts.sourcePill(category));
+        UpdateInfo update = host.updateFor(entry);
+        if (update != null) {
+            titleRow.getChildren().add(CardParts.updateDiamond(12,
+                    "Mise à jour disponible : " + update.currentLabel() + " → " + update.targetLabel()));
+        }
         switch (entry.getStatus()) {
             case LOADING -> {
                 ProgressIndicator spinner = new ProgressIndicator();

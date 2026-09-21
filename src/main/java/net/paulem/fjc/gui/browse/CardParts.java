@@ -4,11 +4,13 @@ import javafx.application.Platform;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
 import javafx.scene.control.Label;
+import javafx.scene.control.Tooltip;
 import javafx.scene.image.ImageView;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
 import javafx.scene.paint.Color;
+import javafx.scene.shape.Polygon;
 import javafx.scene.shape.Rectangle;
 import javafx.scene.text.TextAlignment;
 import net.paulem.fjc.gui.model.ModCategory;
@@ -89,6 +91,18 @@ public final class CardParts {
         Label label = new Label(text);
         label.getStyleClass().add("text-muted");
         return label;
+    }
+
+    /** The "update available" marker: a plain geometric diamond. */
+    public static Polygon updateDiamond(double size, @Nullable String tooltip) {
+        double half = size / 2;
+        Color fill = Color.web("#3fb950");
+        Polygon diamond = new Polygon(half, 0, size, half, half, size, 0, half);
+        diamond.setFill(fill);
+        diamond.setStroke(fill.darker());
+        diamond.setStrokeWidth(1);
+        if (tooltip != null) Tooltip.install(diamond, new Tooltip(tooltip));
+        return diamond;
     }
 
     public static String hex(Color c) {

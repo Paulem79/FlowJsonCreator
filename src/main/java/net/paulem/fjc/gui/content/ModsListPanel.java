@@ -29,12 +29,16 @@ import net.paulem.fjc.flow.mod.CurseForgeMod;
 import net.paulem.fjc.flow.mod.Mod;
 import net.paulem.fjc.flow.mod.ModrinthMod;
 import net.paulem.fjc.flow.mod.UrlMod;
+import net.paulem.fjc.gui.browse.CardParts;
 import net.paulem.fjc.gui.browse.CurseForgeSource;
 import net.paulem.fjc.gui.browse.ModrinthSource;
 import net.paulem.fjc.gui.browse.SearchResult;
 import net.paulem.fjc.gui.components.PropertiesViewerPopup;
+import net.paulem.fjc.gui.components.UpdatesDialog;
 import net.paulem.fjc.gui.model.ModCategory;
 import net.paulem.fjc.gui.model.ModEntry;
+import net.paulem.fjc.update.UpdateChecker;
+import net.paulem.fjc.update.UpdateInfo;
 import net.paulem.fjc.utils.CFUtils;
 import net.paulem.fjc.utils.FileUtils;
 import net.paulem.fjc.utils.JarMetadata;
@@ -61,6 +65,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
 
@@ -102,7 +107,12 @@ public class ModsListPanel extends VBox {
     /** URL mods whose jar was already fetched this session, so a failed fetch is not retried on every reload. */
     private final Set<String> urlFetchAttempted = ConcurrentHashMap.newKeySet();
 
+    /** Newer versions found by the update check, by installed mod. */
+    private final Map<Mod, UpdateInfo> updates = new ConcurrentHashMap<>();
+    private final AtomicLong updateGeneration = new AtomicLong(0);
+
     private ExecutorService bgExecutor;
+    private ExecutorService updateExecutor;
     private ScheduledExecutorService uiScheduler;
     private volatile boolean executorsStarted = false;
 
@@ -111,6 +121,10 @@ public class ModsListPanel extends VBox {
     private final Map<ModCategory, ToggleButton> sourceToggles = new EnumMap<>(ModCategory.class);
     private final Label totalCountLabel = new Label();
     private final Label placeholder = new Label();
+    private final Button updateAllBtn = new Button();
+    private final Label updateStatus = new Label();
+    /** How many updates the list was last refreshed for, so the cards are not rebuilt on every finished check. */
+    private int shownUpdates = 0;
 
     // Only touched on the FX thread
     private final ObservableList<ModEntry> master = FXCollections.observableArrayList();
@@ -127,6 +141,11 @@ public class ModsListPanel extends VBox {
         @Override
         public void confirmAndRemove(ModEntry entry) {
             ModsListPanel.this.confirmAndRemove(entry);
+        }
+
+        @Override
+        public UpdateInfo updateFor(ModEntry entry) {
+            return updates.get(entry.getSource());
         }
     };
 
@@ -178,6 +197,11 @@ public class ModsListPanel extends VBox {
         refreshBtn.setTooltip(new Tooltip("Rafraîchir les infos depuis Modrinth/CurseForge"));
         refreshBtn.setOnAction(e -> refreshAll());
         toolbar.getChildren().add(refreshBtn);
+
+        updateAllBtn.setOnAction(e -> openUpdatesDialog());
+        updateStatus.getStyleClass().add("text-muted");
+        toolbar.getChildren().addAll(updateAllBtn, updateStatus);
+        refreshUpdateUi(0, 0);
 
         totalCountLabel.getStyleClass().add("text-muted");
         placeholder.getStyleClass().add("text-muted");
@@ -289,6 +313,12 @@ public class ModsListPanel extends VBox {
             t.setDaemon(true);
             return t;
         });
+        // Few threads: each check is 2-3 requests and Modrinth rate-limits (HttpJson waits those out)
+        updateExecutor = Executors.newFixedThreadPool(4, r -> {
+            Thread t = new Thread(r, "fjc-update-check");
+            t.setDaemon(true);
+            return t;
+        });
         uiScheduler = Executors.newSingleThreadScheduledExecutor(r -> {
             Thread t = new Thread(r, "fjc-ui-throttler");
             t.setDaemon(true);
@@ -367,6 +397,94 @@ public class ModsListPanel extends VBox {
         for (ModrinthMod mr : content.modrinthMods) {
             resolveModrinth(mr, gen, forceRefresh);
         }
+
+        checkForUpdates(content);
+    }
+
+    // ------------------------------------------------------------------
+    // Updates
+    // ------------------------------------------------------------------
+
+    /** Looks for newer versions of every Modrinth/CurseForge mod in the background; cards get a diamond as results arrive. */
+    private void checkForUpdates(ModsJson content) {
+        long gen = updateGeneration.incrementAndGet();
+        updates.clear();
+
+        List<Mod> targets = new ArrayList<>(content.modrinthMods);
+        targets.addAll(content.curseFiles);
+        int total = targets.size();
+        AtomicInteger done = new AtomicInteger();
+        AtomicInteger failed = new AtomicInteger();
+        refreshUpdateUiLater(0, total, 0);
+
+        for (Mod mod : targets) {
+            updateExecutor.submit(() -> {
+                try {
+                    UpdateChecker.check(mod).ifPresent(update -> {
+                        if (gen == updateGeneration.get()) updates.put(mod, update);
+                    });
+                } catch (Exception ex) {
+                    failed.incrementAndGet();
+                    debug("Vérification de mise à jour impossible pour " + mod, ex);
+                }
+                if (gen != updateGeneration.get()) return;
+                refreshUpdateUiLater(done.incrementAndGet(), total, failed.get());
+            });
+        }
+    }
+
+    private void refreshUpdateUiLater(int checked, int total, int failed) {
+        Platform.runLater(() -> refreshUpdateUi(checked, total, failed));
+    }
+
+    private void refreshUpdateUi(int checked, int total) {
+        refreshUpdateUi(checked, total, 0);
+    }
+
+    /** FX thread. {@code checked < total} means the check is still running. */
+    private void refreshUpdateUi(int checked, int total, int failed) {
+        int count = updates.size();
+        boolean running = checked < total;
+
+        updateAllBtn.setGraphic(CardParts.updateDiamond(12, null));
+        updateAllBtn.setText(count == 0 ? "Tout mettre à jour" : "Tout mettre à jour (" + count + ")");
+        updateAllBtn.setDisable(count == 0);
+        updateAllBtn.setTooltip(new Tooltip(count == 0 ? "Aucune mise à jour disponible" : "Choisir les mises à jour à appliquer"));
+
+        if (running) {
+            updateStatus.setText("Recherche de mises à jour... " + checked + "/" + total);
+        } else if (failed > 0) {
+            updateStatus.setText(failed + " vérification(s) échouée(s)");
+        } else {
+            updateStatus.setText(total == 0 || count > 0 ? "" : "Tout est à jour");
+        }
+
+        // Cards read the update map when built: rebuild them only when it changed
+        if (count != shownUpdates || !running) {
+            shownUpdates = count;
+            listView.refresh();
+        }
+    }
+
+    private void openUpdatesDialog() {
+        List<UpdatesDialog.Row> rows = new ArrayList<>();
+        for (UpdateInfo update : updates.values()) {
+            ModEntry entry = allEntries.get(update.current());
+            if (entry == null) continue; // removed since the check
+            rows.add(new UpdatesDialog.Row(update, entry.getTitle(),
+                    entry.getInfo() != null ? entry.getInfo().iconUrl() : null, entry.getCategory()));
+        }
+        if (rows.isEmpty()) return;
+        rows.sort(Comparator.comparing(row -> row.title().toLowerCase()));
+
+        new UpdatesDialog(stage, rows, this::applyUpdates).show();
+    }
+
+    private void applyUpdates(List<UpdateInfo> chosen) {
+        Map<Mod, Mod> replacements = new java.util.LinkedHashMap<>();
+        for (UpdateInfo update : chosen) replacements.put(update.current(), update.target());
+        JsonUtils.replaceMods(replacements);
+        refreshUpdateUi(1, 1);
     }
 
     /**
@@ -494,6 +612,7 @@ public class ModsListPanel extends VBox {
         if (mod == null) return;
         allEntries.remove(mod);
         dirty.set(true);
+        if (updates.remove(mod) != null) Platform.runLater(() -> refreshUpdateUi(1, 1));
     }
 
     private static String formatSize(long bytes) {
@@ -508,5 +627,6 @@ public class ModsListPanel extends VBox {
     public void shutdown() {
         if (uiScheduler != null) uiScheduler.shutdownNow();
         if (bgExecutor != null) bgExecutor.shutdownNow();
+        if (updateExecutor != null) updateExecutor.shutdownNow();
     }
 }
