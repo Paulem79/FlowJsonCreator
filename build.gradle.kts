@@ -38,7 +38,7 @@ dependencies {
     implementation("org.kordamp.ikonli:ikonli-material2-pack:12.+")
 
     // WebP decoding (Modrinth serves its icons as WebP, which JavaFX cannot read)
-    implementation("com.twelvemonkeys.imageio:imageio-webp:3.12.0")
+    implementation("com.twelvemonkeys.imageio:imageio-webp:3.15.2")
 
     // Core
     implementation("com.google.guava:guava:33.5.0-jre")
