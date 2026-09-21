@@ -4,6 +4,7 @@ import atlantafx.base.theme.PrimerDark;
 import io.github.matyrobbrt.curseforgeapi.CurseForgeAPI;
 import javafx.scene.image.Image;
 import net.paulem.fjc.gui.browse.BrowsePanel;
+import net.paulem.fjc.gui.components.ExportPopup;
 import net.paulem.fjc.gui.content.ModsListPanel;
 import net.paulem.fjc.flow.ModsJson;
 import net.paulem.fjc.utils.JsonUtils;
@@ -112,6 +113,10 @@ public class Main extends Application {
         Button importBtn = iconButton("Importer un manifest", Material2AL.CLOUD_UPLOAD);
         modsViewerBox.getChildren().add(importBtn);
         importBtn.setOnAction(actionEvent -> onImportManifest(stage));
+
+        Button exportBtn = iconButton("Exporter en .zip", Material2AL.ARCHIVE);
+        modsViewerBox.getChildren().add(exportBtn);
+        exportBtn.setOnAction(actionEvent -> new ExportPopup(stage).show());
 
         modsJsonBox.getChildren().add(modsViewerBox);
 
