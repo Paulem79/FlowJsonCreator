@@ -268,6 +268,12 @@ public class BrowsePanel extends VBox {
     // Filters -> query
     // ------------------------------------------------------------------
 
+    /** The Minecraft version last chosen in the search filter, i.e. the one the modpack targets; null if none. */
+    public static @Nullable String savedGameVersion() {
+        String v = PREFS.get(PREF_VERSION, ALL_VERSIONS);
+        return v.equals(ALL_VERSIONS) ? null : v;
+    }
+
     private @Nullable String selectedGameVersion() {
         String v = versionBox.getValue();
         return v == null || v.equals(ALL_VERSIONS) ? null : v;

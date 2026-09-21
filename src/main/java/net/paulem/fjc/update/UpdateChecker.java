@@ -23,14 +23,13 @@ import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.time.OffsetDateTime;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
 /**
- * Looks for a newer version of a mod, staying on what is installed: same game version(s) and loader, and never a
+ * Looks for a newer version of a mod, staying on the modpack's Minecraft version and the installed loader, and never a
  * less stable release channel than the installed one (an installed release only ever updates to a release).
  * URL mods are pinned to a file and have nothing to ask, so they never have updates.
  */
@@ -38,9 +37,13 @@ public final class UpdateChecker {
     private UpdateChecker() {
     }
 
-    public static Optional<UpdateInfo> check(Mod mod) throws Exception {
-        if (mod instanceof ModrinthMod mr) return checkModrinth(mr);
-        if (mod instanceof CurseForgeMod cf) return checkCurseForge(cf);
+    /**
+     * @param gameVersion the Minecraft version the modpack targets. Without it, the oldest stable version the
+     *                    installed file supports is used, so an update never drops support for it.
+     */
+    public static Optional<UpdateInfo> check(Mod mod, @Nullable String gameVersion) throws Exception {
+        if (mod instanceof ModrinthMod mr) return checkModrinth(mr, gameVersion);
+        if (mod instanceof CurseForgeMod cf) return checkCurseForge(cf, gameVersion);
         return Optional.empty();
     }
 
@@ -62,7 +65,7 @@ public final class UpdateChecker {
     // Modrinth
     // ------------------------------------------------------------------
 
-    private static Optional<UpdateInfo> checkModrinth(ModrinthMod mr) throws IOException {
+    private static Optional<UpdateInfo> checkModrinth(ModrinthMod mr, @Nullable String targetGameVersion) throws IOException {
         JsonObject installed = installedModrinthVersion(mr);
         if (installed == null) return Optional.empty();
 
@@ -73,12 +76,21 @@ public final class UpdateChecker {
 
         StringBuilder url = new StringBuilder(Modrinth.MODRINTH_API_LINK + "/project/" + encode(mr.getProjectReference()) + "/version");
         String sep = "?";
-        for (String key : List.of("loaders", "game_versions")) {
-            JsonElement values = installed.get(key);
-            if (values != null && values.isJsonArray() && !values.getAsJsonArray().isEmpty()) {
-                url.append(sep).append(key).append('=').append(encode(values.toString()));
-                sep = "&";
-            }
+        JsonElement loaders = installed.get("loaders");
+        if (loaders != null && loaders.isJsonArray() && !loaders.getAsJsonArray().isEmpty()) {
+            url.append(sep).append("loaders=").append(encode(loaders.toString()));
+            sep = "&";
+        }
+        // One game version only: an installed file often lists a whole range (snapshots, next minor version...)
+        // and filtering on all of them would offer builds for a Minecraft version the modpack is not on.
+        List<String> installedVersions = new java.util.ArrayList<>();
+        JsonElement versions = installed.get("game_versions");
+        if (versions != null && versions.isJsonArray()) versions.getAsJsonArray().forEach(v -> installedVersions.add(v.getAsString()));
+        String gameVersion = targetGameVersion != null ? targetGameVersion : oldestStable(installedVersions);
+        if (gameVersion != null) {
+            JsonArray wanted = new JsonArray();
+            wanted.add(gameVersion);
+            url.append(sep).append("game_versions=").append(encode(wanted.toString()));
         }
 
         JsonObject best = null;
@@ -119,7 +131,7 @@ public final class UpdateChecker {
     // CurseForge
     // ------------------------------------------------------------------
 
-    private static Optional<UpdateInfo> checkCurseForge(CurseForgeMod cf) throws Exception {
+    private static Optional<UpdateInfo> checkCurseForge(CurseForgeMod cf, @Nullable String targetGameVersion) throws Exception {
         if (Main.cfApi == null) return Optional.empty();
         File installed = CFUtils.getFileFromId(cf.projectID(), cf.fileID());
         if (installed == null) return Optional.empty();
@@ -132,16 +144,17 @@ public final class UpdateChecker {
         List<String> gameVersions = installed.gameVersions().stream().filter(v -> v.matches("\\d+\\.\\d+.*")).toList();
         List<String> loaders = installed.gameVersions().stream().map(String::toLowerCase).filter(Labels::isLoader).distinct().toList();
 
+        // One game version only, see checkModrinth
+        String gameVersion = targetGameVersion != null ? targetGameVersion : oldestStable(gameVersions);
         Map<Integer, File> candidates = new HashMap<>();
-        for (String gameVersion : gameVersions.isEmpty() ? Collections.<String>singletonList(null) : gameVersions) {
-            FileListQuery query = FileListQuery.of();
-            if (gameVersion != null) query.gameVersion(gameVersion);
-            ModLoaderType loader = loaders.size() == 1 ? toLoaderType(loaders.get(0)) : null;
-            if (loader != null) query.modLoaderType(loader);
-            query.pageSize(50);
+        FileListQuery query = FileListQuery.of();
+        if (gameVersion != null) query.gameVersion(gameVersion);
+        ModLoaderType loader = loaders.size() == 1 ? toLoaderType(loaders.get(0)) : null;
+        if (loader != null) query.modLoaderType(loader);
+        query.pageSize(50);
 
-            Response<List<File>> response = Main.cfApi.getHelper().getModFiles(cf.projectID(), query);
-            if (response.isEmpty()) continue;
+        Response<List<File>> response = Main.cfApi.getHelper().getModFiles(cf.projectID(), query);
+        if (!response.isEmpty()) {
             for (File f : response.get()) candidates.put(f.id(), f);
         }
 
@@ -151,6 +164,7 @@ public final class UpdateChecker {
             Instant date = instant(f.fileDate());
             if (date == null || !date.isAfter(bestDate) || f.id() == installed.id() || !f.isAvailable()) continue;
             if (rank(f.releaseType().name()) > installedRank) continue;
+            if (gameVersion != null && !f.gameVersions().contains(gameVersion)) continue;
             if (!loaders.isEmpty() && f.gameVersions().stream().map(String::toLowerCase).noneMatch(loaders::contains)) continue;
             best = f;
             bestDate = date;
@@ -172,6 +186,21 @@ public final class UpdateChecker {
     // ------------------------------------------------------------------
     // Helpers
     // ------------------------------------------------------------------
+
+    /** The lowest plain release number ("1.20.1", "26.2"; no snapshots) of the list, or null if there is none. */
+    private static @Nullable String oldestStable(List<String> versions) {
+        return versions.stream().filter(v -> v.matches("\\d+(\\.\\d+)+"))
+                .min(UpdateChecker::compareVersions).orElse(null);
+    }
+
+    private static int compareVersions(String a, String b) {
+        String[] pa = a.split("\\."), pb = b.split("\\.");
+        for (int i = 0; i < Math.max(pa.length, pb.length); i++) {
+            int x = i < pa.length ? Integer.parseInt(pa[i]) : 0, y = i < pb.length ? Integer.parseInt(pb[i]) : 0;
+            if (x != y) return Integer.compare(x, y);
+        }
+        return 0;
+    }
 
     /** Lower is more stable: release, then beta, then alpha. */
     private static int rank(String releaseType) {

@@ -416,11 +416,12 @@ public class ModsListPanel extends VBox {
         AtomicInteger done = new AtomicInteger();
         AtomicInteger failed = new AtomicInteger();
         refreshUpdateUiLater(0, total, 0);
+        String gameVersion = net.paulem.fjc.gui.browse.BrowsePanel.savedGameVersion();
 
         for (Mod mod : targets) {
             updateExecutor.submit(() -> {
                 try {
-                    UpdateChecker.check(mod).ifPresent(update -> {
+                    UpdateChecker.check(mod, gameVersion).ifPresent(update -> {
                         if (gen == updateGeneration.get()) updates.put(mod, update);
                     });
                 } catch (Exception ex) {
