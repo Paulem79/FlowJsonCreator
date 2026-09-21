@@ -41,7 +41,7 @@ dependencies {
     implementation("com.twelvemonkeys.imageio:imageio-webp:3.15.2")
 
     // Core
-    implementation("com.google.guava:guava:33.5.0-jre")
+    implementation("com.google.guava:guava:33.7.1-jre")
     implementation("com.google.code.gson:gson:2.+")
     implementation("javax.xml.bind:jaxb-api:2.4.0-b180830.0359")
 
