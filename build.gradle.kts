@@ -11,7 +11,7 @@ plugins {
 }
 
 group = "net.paulem.fjc"
-version = "1.4.2"
+version = providers.gradleProperty("releaseVersion").getOrElse("1.4.2")
 
 repositories {
     mavenCentral()

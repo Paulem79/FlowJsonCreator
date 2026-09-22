@@ -32,10 +32,10 @@ jobs:
         run: chmod +x gradlew
 
       - name: Gradle jpackage
-        run: ./gradlew jpackage
+        run: ./gradlew jpackage -PreleaseVersion=${{ github.event.inputs.version }}
 
       - name: Gradle zipjpackage
-        run: ./gradlew zipjpackage
+        run: ./gradlew zipjpackage -PreleaseVersion=${{ github.event.inputs.version }}
 
       - name: Archive build artifacts
         uses: actions/upload-artifact@v7
