@@ -21,19 +21,44 @@ import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 
 public class ModrinthUtils {
+    private static final int MAX_ATTEMPTS = 4;
+
     // Mémoïse les requêtes Modrinth pour éviter de refaire le même appel réseau
     // plusieurs fois quand plusieurs versions proviennent du même projet.
+    // Seuls les succès sont mis en cache : une erreur (timeout, 429...) ne doit pas
+    // marquer un slug comme introuvable pour le reste de la session, sinon il reste
+    // bloqué en erreur même après un rafraîchissement manuel.
     private static final ConcurrentHashMap<String, Optional<Project>> PROJECT_CACHE = new ConcurrentHashMap<>();
 
     @Nullable
     public static Project getModFromSlug(String slug) {
-        return PROJECT_CACHE.computeIfAbsent(slug, s -> {
+        try {
+            return PROJECT_CACHE.computeIfAbsent(slug, ModrinthUtils::fetchModFromSlug).orElse(null);
+        } catch (RuntimeException e) {
+            return null;
+        }
+    }
+
+    private static Optional<Project> fetchModFromSlug(String slug) {
+        for (int attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
             try {
-                return Optional.ofNullable(Main.MODRINTH.getProject(s));
+                return Optional.ofNullable(Main.MODRINTH.getProject(slug));
             } catch (URISyntaxException | IOException e) {
-                return Optional.empty();
+                boolean rateLimited = e.getMessage() != null && e.getMessage().contains("429");
+                if (rateLimited && attempt < MAX_ATTEMPTS) {
+                    try {
+                        HttpJson.sleepBackoff(attempt, null);
+                        continue;
+                    } catch (IOException interrupted) {
+                        throw new RuntimeException(interrupted);
+                    }
+                }
+                // Ne pas mettre en cache : computeIfAbsent ne mémorise rien si le mapper échoue,
+                // donc le prochain appel (refresh manuel ou nouvelle résolution) retentera l'appel réseau.
+                throw new RuntimeException(e);
             }
-        }).orElse(null);
+        }
+        throw new IllegalStateException("unreachable");
     }
 
     /**
