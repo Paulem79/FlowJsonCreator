@@ -32,7 +32,7 @@ dependencies {
     implementation("org.slf4j:slf4j-simple:2.0.19")
 
     // UI
-    implementation("io.github.mkpaz:atlantafx-base:2.+")
+    implementation("io.github.mkpaz:atlantafx-base:3.+")
     implementation("com.github.Dansoftowner:FXTaskbarProgressBar:v11.4")
     implementation("org.kordamp.ikonli:ikonli-javafx:12.+")
     implementation("org.kordamp.ikonli:ikonli-material2-pack:12.+")
